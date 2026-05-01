@@ -1,0 +1,23 @@
+{
+  "typeCheckingMode": "strict",
+
+  "exclude": [
+    "**/site-packages",
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.venv",
+    "**/venv",
+    "**/.git",
+    "**/dist",
+    "**/build",
+    "**/.mypy_cache",
+    "**/.*",
+  ],
+  "reportMissingTypeStubs": false,
+  "reportUnknownMemberType": false,
+  "reportUnknownArgumentType": false,
+  "reportUnknownVariableType": false,
+  "reportUnknownParameterType": false
+
+
+}
