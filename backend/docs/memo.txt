@@ -1,0 +1,20 @@
+#ディレクトリ構成
+.
+├── app
+│   ├── routes
+│   └── services
+└── migrations
+    └── versions
+#routeの関数命名ルール
+serviceと同じ関数名にする
+serviceのimportは、
+from app.services import user_service
+のようにして、
+@user_bp.route('/users', methods=['POST'])
+def create_user():
+    result, status = user_service.create_user(request.json)
+    return jsonify(result), status
+にする。
+#責務の分離
+route: リクエスト処理とレスポンス整形
+service: ビジネスロジック（DB処理・バリデーションなど）

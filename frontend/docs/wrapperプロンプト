@@ -1,0 +1,153 @@
+下記の指示に従い、`src/api/service/taskOrderService.ts` を出力してください。
+コードを提示する前に、作成する関数と対応する使用するフック関数の一覧を提示してください。
+**
+
+あなたはReact + TypeScriptのプロジェクトで、orval + React Query を利用したAPI呼び出しを
+service層で整理する専門家です。
+
+以下の【全体原則】と【関数作成ルール】に従い、そして【期待するコード例】を基に指定されたファイルを作成してください。
+
+-----
+
+### 【全体原則】
+
+1.  **orval で自動生成済みのReact Query Hooksおよび型定義を利用します。**
+      * `src/api/generated/progressApi.ts` に、APIエンドポイントに対応する各種フック（例: `useGetTasks`, `useCreateTask` など）が生成済みです。
+      * 型定義は `src/api/generated/model/` からインポートします。
+2.  **共通Axiosインスタンス**（`src/api/axiosInstance.ts`）および **QueryClient**（`src/api/queryClient.ts`）は既に構築済みです。
+3.  **UIはservice層を通してのみAPIを利用する**方針です。
+4.  **ディレクトリ構成**
+    ```
+    src/
+    ├── api/
+    │    ├── generated/
+    │    │    ├── model/          # ← 型定義ファイル群
+    │    │    └── progressApi.ts  # orval生成コード
+    │    ├── axiosInstance.ts
+    │    ├── queryClient.ts
+    │    └── service/
+    │         ├── companyService.ts
+    │         ├── userService.ts
+    │         ├── taskCoreService.ts
+    │         ├── taskOrderService.ts   # ← 今回ここを作成する対象
+    │         ├── taskAccessService.ts
+    │         ├── taskExportService.ts
+    │         └── ... 他のサービスファイル
+    ```
+5.  **サービスファイルの分割方針:**
+      * バックエンドのルーティングファイル（例: `task_core_route.py`, `company_routes.py`）に対応するようにフロントエンドのサービスファイルを分割します。
+      * 特にタスク関連のエンドポイントは複数ファイルに分割されているため、それぞれに対応するサービスファイルを作成します。
+
+
+### 【関数作成ルール】
+
+1. **命名規則**
+
+   * 一覧取得（GETリスト系） → `use[Entity]s` (例: `useTasks`, `useCompanies`, `useTaskOrders`)
+   * 単一取得（GET単体系） → `use[Entity]ById` (例: `useTaskById`, `useCompanyById`)
+   * 登録（POST系） → `useCreate[Entity]` (例: `useCreateTask`, `useCreateCompany`)
+   * 更新（PUT/PATCH系） → `useUpdate[Entity]` (例: `useUpdateTask`, `useUpdateCompany`, `useUpdateTaskOrder`)
+   * 削除（DELETE系） → `useDelete[Entity]` (例: `useDeleteTask`, `useDeleteCompany`)
+   * **注意**: `progressApi.ts`で生成されたフック名に合わせて、`useGetProgressTasks` のような形式から、`useTasks` のように短縮してラップします。
+
+2. **戻り値の形**
+
+   * 一覧・単体取得系（Query系）: `{ data, isLoading, error }`
+   * 更新・登録・削除系（Mutation系）: `{ mutate, isPending, error }`
+
+3. **キャッシュ更新（最も効率的で堅牢な方法）**
+
+   * **ミューテーション（作成、更新、削除）完了後 `onSuccess` コールバック内で必ず実行します。**
+   * **対象:**
+
+     * **関連するリストクエリ**を無効化します。（例: `queryClient.invalidateQueries({ queryKey: ['getTasks'] })`）
+     * **特定のエンティティIDが関わる更新・削除の場合、その個別クエリも無効化します。（例: `queryClient.invalidateQueries({ queryKey: ['getTask', variables.id] })`）**
+   * **例（`useUpdateTask`の場合）:**
+
+     ```typescript
+     onSuccess: (data, variables) => {
+       queryClient.invalidateQueries({ queryKey: ['getTasks'] }); // リストクエリを無効化
+       if (variables.id) {
+         queryClient.invalidateQueries({ queryKey: ['getTask', variables.id] });
+       }
+     },
+     ```
+   * `useGetProgressTasks`のクエリキーは`['getTasks']`、`useGetProgressTasksTaskId`のクエリキーは`['getTask', taskId]`といった形式で、クエリキーは生成されたフック名から推測してください。
+
+4. **orval生成フックの引数準拠**
+
+   * **orval生成フックの引数（params, body など）の必須/任意は、生成コードのシグネチャに完全準拠すること。**
+
+     * 例：orvalが `params: GetProgressTaskOrdersParams` としている場合は `params?` を付けない。
+     * 例：orvalが `params?: GetProgressCompaniesParams` としている場合のみ `?` を付ける。
+
+5. **ジェネリクス指定ルール**
+
+   * orval生成フックのジェネリクス（TData, TError, TContextなど）はデフォルト型を利用する。（記載しない）
+
+6. **orval生成Hooksの再ラップ**
+
+   * `src/api/generated/progressApi.ts` で生成済みHooksをそのまま返さず、UIで使いやすい形に再ラップします。
+   * エイリアス（`as`キーワード）を使用して名前の衝突を避けてください。
+
+7. **型指定**
+
+   * 引数や戻り値の型はすべて `src/api/generated/model/` からインポートしてください。
+   * **必要な型のみを厳選してインポートしてください。**
+   * `ErrorResponse`および`DefaultErrorResponse`は、React Queryフックの`TError`型として頻繁に使用されるため、通常はインポートしてください。
+   * **使用するフックの引数や戻り値の型（特に`TData`や`TVariables`の部分）に合わせて、`progressApi.ts`内のフック定義から適切な型を判断してください。**
+   重要：「paramsやbodyなど、すべての引数の?（任意指定）は、必ずprogressApi.tsで生成されたフックのシグネチャに準拠すること。推測や慣習で変更しないこと。」
+
+8. **戻り値整形時のコメント明記**
+
+   * UIで扱いやすいように戻り値を整形する場合は、**サービス層内にコメントでその意図を明示すること。**
+
+### 【出力形式】
+
+  - 完成したコードを**1つのTypeScriptファイルとして出力**してください。
+  - コード以外の説明は不要です。
+
+-----
+
+### 【期待するコード例】
+
+以下のような構造で完成コードを提示してください。
+
+```typescript
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  // progressApi.tsから該当するフックをインポートし、必要に応じてエイリアスを付ける
+  useGetProgressTaskOrders, // タスクの順序リスト取得用フック
+  usePutProgressTaskOrders as usePutProgressTaskOrdersBase, // タスクの順序更新用フック（Orvalの生成名に合わせる）
+} from '@/api/generated/progressApi';
+import type {
+  GetProgressTaskOrdersParams,
+  TaskOrder, // orvalで生成されたタスク順序の型、あるいはTaskOrder[]のようなリスト型
+  TaskOrderInput, // タスク順序更新の入力型（Orvalの生成名に合わせる）
+  ErrorResponse, // TErrorとして頻繁に使用される
+  DefaultErrorResponse, // TErrorとして頻繁に使用される
+} from '@/api/generated/model'; // 修正されたパスと厳選された型をインポート
+
+// ↓ここから各関数を実装
+export const useTaskOrders = (params?: GetProgressTaskOrdersParams) => {
+  const { data, isLoading, error } = useGetProgressTaskOrders(params);
+  return { data, isLoading, error };
+};
+
+export const useUpdateTaskOrder = () => {
+  const queryClient = useQueryClient();
+  // usePutProgressTaskOrdersBaseのvariablesはTaskOrderInput型で、その中に更新対象のIDは含まれない可能性が高い
+  // そのため、ここではリスト全体のキャッシュ無効化に限定する。
+  const { mutate, isPending, error } = usePutProgressTaskOrdersBase({
+    mutation: { // Orvalが生成するUseMutationOptionsのラッパー構造
+      onSuccess: () => {
+        // 順序リストのクエリキーを無効化
+        // useGetProgressTaskOrders のクエリキーは通常 ['getTaskOrders'] のような形
+        queryClient.invalidateQueries({ queryKey: ['getTaskOrders'] });
+      },
+    },
+  });
+  return { mutate, isPending, error };
+};
+```
+

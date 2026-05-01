@@ -1,0 +1,9 @@
+{{ user_name }} 様
+
+以下の目標についてリマインド通知です。
+
+タイトル: {{ objective_title }}
+期限: {{ due_date }}
+最新の更新日: {{ latest_report_date }}
+
+必要に応じて進捗を更新してください。

@@ -1,0 +1,9 @@
+src/
+├── api/
+│   ├── index.ts                  ← Axios共通設定（インスタンス）
+│   ├── user_api.ts              ← ユーザー・ログイン・スコープ
+│   ├── organization_api.ts      ← 組織管理
+│   ├── task_api.ts              ← タスク基本操作
+│   ├── objective_api.ts         ← オブジェクティブ・進捗管理
+│   ├── access_api.ts            ← アクセススコープ関連
+│   └── ai_api.ts                ← AI補完機能

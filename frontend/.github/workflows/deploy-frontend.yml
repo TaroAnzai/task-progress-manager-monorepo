@@ -1,0 +1,43 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches:
+      - main # main に push されたら実行
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # GitHub Secrets から .env.production を生成
+      - name: Create .env.production
+        run: |
+          echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env.production
+          echo "VITE_OPENAPI_URL=${{ secrets.VITE_OPENAPI_URL }}" >> .env.production
+
+      - name: Install dependencies and build
+        run: |
+          npm ci
+          npm run generate:api
+          npm run build
+
+      # 成果物(dist)をレンタルサーバーにアップロード
+      - name: Deploy via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: 8022
+          source: dist/**
+          target: /home/r6441231/public_html/anzai-home.com/progress/
+          strip_components: 1

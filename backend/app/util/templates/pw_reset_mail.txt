@@ -1,0 +1,42 @@
+{% set name_ja = (user_name ~ " 様") if user_name else "ご利用者 様" %}
+{% set name_en = (" " ~ user_name) if user_name else "" %}
+
+{{ name_ja }}
+
+{{ app_name or company_name or "本サービス" }} へのパスワード再設定リクエストを受け付けました。
+下記のリンクからパスワードを再設定してください（有効期限：{{ expires_minutes }}分）。
+
+{{ reset_url }}
+
+※このメールに心当たりがない場合は、本メールは破棄してください。リンクは一定時間で無効になります。
+ご不明点は {{ support_email }} までご連絡ください。
+
+{% if request_ip or request_time %}
+参考情報:
+{% if request_ip %}- リクエスト元IP: {{ request_ip }}{% endif %}
+{% if request_time %}- リクエスト時刻: {{ request_time }}{% endif %}
+{% endif %}
+
+— {{ company_name or app_name or "Support Team" }}
+
+
+---
+ENGLISH
+
+Hello{{ name_en }},
+
+We received a request to reset your password for {{ app_name or company_name or "our service" }}.
+Please use the link below to set a new password. This link expires in {{ expires_minutes }} minutes.
+
+{{ reset_url }}
+
+If you did not request this, you can safely ignore this email. The link will expire automatically.
+For assistance, contact us at {{ support_email }}.
+
+{% if request_ip or request_time %}
+Reference:
+{% if request_ip %}- Request IP: {{ request_ip }}{% endif %}
+{% if request_time %}- Request time: {{ request_time }}{% endif %}
+{% endif %}
+
+— {{ company_name or app_name or "Support Team" }}
