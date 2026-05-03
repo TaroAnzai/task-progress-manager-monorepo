@@ -71,7 +71,7 @@ def superuser(app: Flask):
     user.is_superuser = True
     user.password_hash = generate_password_hash("superpass")
     _db.session.add(user)
-    _db.session.commit()
+    _db.session.flush()
     return {"id": user.id, "email": user.email, "password": "superpass"}
 
 
@@ -82,7 +82,7 @@ def test_company(app: Flask):
     company = Company()
     company.name = "TestCompany"
     _db.session.add(company)
-    _db.session.commit()
+    _db.session.flush()
 
     return {
         "id": company.id,
@@ -95,7 +95,7 @@ def test_other_company(app: Flask):
     company = Company()
     company.name = "OtherCompany"
     _db.session.add(company)
-    _db.session.commit()
+    _db.session.flush()
 
     return {
         "id": company.id,
@@ -111,7 +111,7 @@ def root_org(app: Flask, test_company:dict[str,Any]):
     org.org_code = "root"
     org.company_id = test_company["id"]
     _db.session.add(org)
-    _db.session.commit()
+    _db.session.flush()
     return {
         "id": org.id,
         "name": org.name,
@@ -126,7 +126,7 @@ def other_root_org(app: Flask, test_other_company: dict[str, Any]):
     org.org_code = "otherRoot"
     org.company_id = test_other_company["id"]
     _db.session.add(org)
-    _db.session.commit()
+    _db.session.flush()
 
     return {
         "id": org.id,
@@ -152,7 +152,7 @@ def systemadmin_user(app: Flask, root_org: dict[str, Any]):
     scope.organization_id = root_org["id"]
     scope.role = OrgRoleEnum.SYSTEM_ADMIN
     _db.session.add(scope)
-    _db.session.commit()
+    _db.session.flush()
     payload = {
         "id": system_admin.id,
         "name": system_admin.name,
@@ -209,7 +209,7 @@ def task_access_users(app: Flask, systemadmin_user: dict[str, Any], root_org: di
         task_access.subject_id = task_subject.id
         task_access.access_level = next(key for key, value in TASK_ACCESS_LABELS.items() if value == level)
         _db.session.add(task_access)
-    _db.session.commit()
+    _db.session.flush()
     return created_users
 
 
@@ -237,7 +237,7 @@ def system_related_users(app: Flask, root_org: dict[str, Any],superuser: dict[st
         scope.organization_id = root_org["id"]
         scope.role = getattr(OrgRoleEnum, role.upper())
         _db.session.add(scope)
-        _db.session.commit()
+        _db.session.flush()
         created_users[role] = {
             "id": user.id,
             "name": user.name,
