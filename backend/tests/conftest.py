@@ -9,7 +9,7 @@ from flask.testing import FlaskClient
 
 import pytest
 from app import create_app, db as _db
-from app.models import AccessScope, Organization, Task, TaskAccessUser, User
+from app.models import AccessScope, AccessSubject, AccessSubjectType, Organization, Task, TaskAccess, User
 from app.constants import TASK_ACCESS_LABELS, OrgRoleEnum
 from config import Config as BaseConfig
 from werkzeug.security import generate_password_hash
@@ -198,10 +198,15 @@ def task_access_users(app: Flask, systemadmin_user: dict[str, Any], root_org: di
             "organization_id": user.organization_id,
             "role": "MEMBER"
         }
+        task_subject = AccessSubject()
+        task_subject.subject_type = AccessSubjectType.USER
+        task_subject.ref_id = user.id
+        _db.session.add(task_subject)
+        _db.session.flush()
 
-        task_access = TaskAccessUser()
+        task_access = TaskAccess()
         task_access.task_id = task.id
-        task_access.user_id = user.id
+        task_access.subject_id = task_subject.id
         task_access.access_level = next(key for key, value in TASK_ACCESS_LABELS.items() if value == level)
         _db.session.add(task_access)
     _db.session.commit()

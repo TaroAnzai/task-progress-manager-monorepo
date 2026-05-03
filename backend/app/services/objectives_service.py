@@ -1,45 +1,45 @@
 # app/services/objectives_service.py
 from datetime import datetime
+from typing import Any
 from app.models import db, Objective, Task, User, ProgressUpdate
 from app.utils import check_task_access
-from app.constants import TaskAccessLevelEnum, StatusEnum, STATUS_LABELS
+from app.constants import TaskAccessLevelEnum, StatusEnum
 from app.service_errors import (
     ServiceValidationError,
     ServicePermissionError,
     ServiceNotFoundError,
 )
-from sqlalchemy.orm import aliased
 from sqlalchemy import exists, func, select
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-
-def get_task_by_id(task_id):
+def _get_task_by_id(task_id: int) -> Task|None:
     return Task.query.filter_by(id=task_id, is_deleted=False).first()
 
 
-def get_task_by_id_with_deleted(task_id):
+def _get_task_by_id_with_deleted(task_id: int) -> Task|None:
     return db.session.get(Task, task_id)
 
 
-def get_objective_by_id(objective_id):
+def _get_objective_by_id(objective_id: int) -> Objective|None:
     return Objective.query.filter_by(id=objective_id, is_deleted=False).first()
 
 
-def get_objective_by_id_with_deleted(objective_id):
+def _get_objective_by_id_with_deleted(objective_id: int) -> Objective|None:
     return db.session.get(Objective, objective_id)
 
 
-def create_objective(data, user):
+def create_objective(db_session:Session,data: dict[str, Any], user: User):
     title = data.get('title')
     task_id = data.get('task_id')
 
     if not title or not task_id:
         raise ServiceValidationError('タイトル・タスクIDは必須です')
 
-    task = get_task_by_id(task_id)
+    task = _get_task_by_id(task_id)
     if not task:
         raise ServiceNotFoundError('タスクが見つかりません')
-    if not check_task_access(user, task, TaskAccessLevelEnum.EDIT):
+    if not check_task_access(db_session, user, task.id, TaskAccessLevelEnum.EDIT):
         raise ServicePermissionError('このタスクにオブジェクティブを追加する権限がありません')
 
     due_date = None
@@ -53,14 +53,13 @@ def create_objective(data, user):
         .filter_by(task_id=task_id).scalar()
     new_order = (max_order or 0) + 1
 
-    objective = Objective(
-        task_id=task_id,
-        title=title,
-        due_date=due_date,
-        assigned_user_id=data.get('assigned_user_id'),
-        display_order=new_order,
-        status = data.get('status'),
-    )
+    objective = Objective()
+    objective.task_id = task_id
+    objective.title = title
+    objective.due_date = due_date
+    objective.assigned_user_id = data.get('assigned_user_id')
+    objective.display_order = new_order
+    objective.status = data.get('status', StatusEnum.NOT_STARTED.value)
 
     db.session.add(objective)
     db.session.commit()
@@ -71,15 +70,15 @@ def create_objective(data, user):
     }
 
 
-def update_objective(objective_id, data, user):
-    objective = get_objective_by_id(objective_id)
+def update_objective(db_session: Session, objective_id: int, data: dict[str, Any], user: User):
+    objective = _get_objective_by_id(objective_id)
     if not objective:
         raise ServiceNotFoundError('オブジェクティブが見つかりません')
-    task = get_task_by_id(objective.task_id)
+    task = _get_task_by_id(objective.task_id)
     if not task:
         raise ServiceNotFoundError('タスクが見つかりません')
 
-    if not check_task_access(user, task, TaskAccessLevelEnum.EDIT):
+    if not check_task_access(db_session, user, task.id, TaskAccessLevelEnum.EDIT):
         raise ServicePermissionError('編集権限がありません')
 
     objective.title = data.get('title', objective.title)
@@ -99,11 +98,11 @@ def update_objective(objective_id, data, user):
         'objective': objective
         }
 
-def get_objectives_for_task(task_id, user):
-    task = get_task_by_id(task_id)
+def get_objectives_for_task(db_session: Session, task_id: int, user: User):
+    task = _get_task_by_id(task_id)
     if not task:
         raise ServiceNotFoundError('タスクが見つかりません')
-    if not check_task_access(user, task, TaskAccessLevelEnum.VIEW):
+    if not check_task_access(db_session, user, task.id, TaskAccessLevelEnum.VIEW):
         raise ServicePermissionError('閲覧権限がありません')
     
     # 最新のProgressUpdateのサブクエリ
@@ -156,36 +155,36 @@ def get_objectives_for_task(task_id, user):
         objective_list.append(objective)
     
     return {'objectives': objective_list}
-def get_objective(objective_id, user):
-    objective = get_objective_by_id(objective_id)
+def get_objective(db_session: Session, objective_id: int, user: User):
+    objective = _get_objective_by_id(objective_id)
     if not objective:
         raise ServiceNotFoundError('オブジェクティブが見つかりません')
 
-    task = get_task_by_id(objective.task_id)
+    task = _get_task_by_id(objective.task_id)
     if not task:
         raise ServiceNotFoundError('タスクが見つかりません')
-    if not check_task_access(user, task, TaskAccessLevelEnum.VIEW):
+    if not check_task_access(db_session, user, task.id, TaskAccessLevelEnum.VIEW):
         raise ServicePermissionError('閲覧権限がありません')
 
     return objective
 
-def _can_delete_objective(objective_id: int) -> bool:
+def _can_delete_objective(db_session: Session, objective_id: int) -> bool:
     return not (
         db.session.execute(select(exists(ProgressUpdate.objective_id == objective_id))).scalar()
     )
-def delete_objective(objective_id:int, user: User, force: bool=False):
-    objective = get_objective_by_id(objective_id)
+def delete_objective(db_session: Session, objective_id: int, user: User, force: bool=False):
+    objective = get_objective(db_session, objective_id, user)
     if not objective:
         raise ServiceNotFoundError('オブジェクティブが見つかりません')
-    task = get_task_by_id(objective.task_id)
+    task = _get_task_by_id(objective.task_id)
     if not task:
         raise ServiceNotFoundError('タスクが見つかりません')
 
-    if not check_task_access(user, task, TaskAccessLevelEnum.EDIT):
+    if not check_task_access(db_session, user, task.id, TaskAccessLevelEnum.EDIT):
         raise ServicePermissionError('削除権限がありません')
 
     if force == True:
-        if not _can_delete_objective(objective.id):
+        if not _can_delete_objective(db_session, objective.id):
             raise ServiceValidationError('このオブジェクティブは関連する進捗更新が存在するため、完全に削除できません。')
         try:
             db.session.delete(objective)

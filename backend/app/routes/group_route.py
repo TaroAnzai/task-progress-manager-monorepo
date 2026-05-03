@@ -19,7 +19,7 @@ from app.services.group_service import (
     list_groups,
 )
 from app.service_errors import ServiceError, format_error_response
-from backend.app.models import User
+from app.models import User
 
 group_bp = Blueprint("groups", __name__, url_prefix="/groups", description="Group API")
 @group_bp.errorhandler(ServiceError)

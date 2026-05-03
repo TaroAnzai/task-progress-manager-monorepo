@@ -2,7 +2,9 @@
 
 from sqlalchemy.orm import Session
 from sqlalchemy import select, exists, and_, or_
-from .models import AccessSubject, GroupMember, TaskAccess, db, TaskAccessUser, TaskAccessOrganization, Organization, User, Task
+from .models import (
+    AccessSubject, 
+    AccessSubjectType, GroupMember, TaskAccess, db, TaskAccessUser, TaskAccessOrganization, Organization, User, Task)
 from .constants import OrgRoleEnum, TaskAccessLevelEnum
 from .constants import (
     TaskAccessLevelEnum,
@@ -131,7 +133,7 @@ def check_task_access(
     # USER
     conditions.append(
         and_(
-            AccessSubject.subject_type == "USER",
+            AccessSubject.subject_type == AccessSubjectType.USER,
             AccessSubject.ref_id == user.id
         )
     )
@@ -140,7 +142,7 @@ def check_task_access(
     if user.organization_id:
         conditions.append(
             and_(
-                AccessSubject.subject_type == "ORGANIZATION",
+                AccessSubject.subject_type == AccessSubjectType.ORGANIZATION,
                 AccessSubject.ref_id == user.organization_id
             )
         )
@@ -149,7 +151,7 @@ def check_task_access(
     if group_ids:
         conditions.append(
             and_(
-                AccessSubject.subject_type == "GROUP",
+                AccessSubject.subject_type == AccessSubjectType.GROUP,
                 AccessSubject.ref_id.in_(group_ids)
             )
         )
@@ -165,6 +167,7 @@ def check_task_access(
             or_(*conditions)
         )
     )
+
     return bool(db_session.execute(stmt).scalar())
 
 def access_level_sufficient(user_level: TaskAccessLevelEnum, required_level: TaskAccessLevelEnum) -> bool:

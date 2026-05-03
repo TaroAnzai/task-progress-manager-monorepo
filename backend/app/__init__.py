@@ -49,6 +49,8 @@ def create_app(config_class: Union[Type[Config], str] = Config):
     from app.routes.user_routes import user_bp
     from app.routes.reminder_routes import reminder_bp
     from app.routes.auth_password_reset_route import password_reset_bp
+    from app.routes.group_route import group_bp
+    from app.routes.group_member_route import group_member_bp
 
     api.register_blueprint(access_scope_bp, url_prefix=f"{URL_PREFIX}{access_scope_bp.url_prefix}")
     api.register_blueprint(ai_bp, url_prefix=f"{URL_PREFIX}{ai_bp.url_prefix}")
@@ -65,6 +67,8 @@ def create_app(config_class: Union[Type[Config], str] = Config):
     api.register_blueprint(user_bp, url_prefix=f"{URL_PREFIX}{user_bp.url_prefix}")
     api.register_blueprint(reminder_bp, url_prefix=f"{URL_PREFIX}{reminder_bp.url_prefix}") 
     api.register_blueprint(password_reset_bp, url_prefix=f"{URL_PREFIX}{password_reset_bp.url_prefix}")
+    api.register_blueprint(group_bp, url_prefix=f"{URL_PREFIX}{group_bp.url_prefix}")
+    api.register_blueprint(group_member_bp, url_prefix=f"{URL_PREFIX}{group_member_bp.url_prefix}")
 
     return app
 

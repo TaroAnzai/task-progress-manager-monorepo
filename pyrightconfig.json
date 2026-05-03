@@ -17,7 +17,8 @@
   "reportUnknownMemberType": false,
   "reportUnknownArgumentType": false,
   "reportUnknownVariableType": false,
-  "reportUnknownParameterType": false
+  "reportUnknownParameterType": false,
 
-
+  "include": ["backend"],
+  "extraPaths": ["backend"]
 }

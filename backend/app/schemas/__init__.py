@@ -1,3 +1,9 @@
+# ruff: noqa: F401
+# pyright: reportUnusedImport=false
+"""This module serves as a central point for importing all schema classes used in the application.
+By importing all schemas here, we can simplify imports in other parts of the application and maintain a cleaner codebase.
+　use like：from app.schemas import UserSchema
+"""
 from .common_schemas import MessageSchema, ErrorResponseSchema, YAMLResponseSchema, DeleteQuerySchema
 from .task_schemas import (
     TaskSchema,
@@ -68,21 +74,4 @@ from .reminder_schemas import (
      ObjectiveReminderLogOutputSchema
      )
 
-__all__ = [
-    'MessageSchema', 'ErrorResponseSchema', 'YAMLResponseSchema', 'DeleteQuerySchema',
-    'TaskSchema', 'TaskInputSchema', 'TaskUpdateSchema', 'TaskCreateResponseSchema', 'TaskListResponseSchema', 'StatusSchema',
-    'OrderSchema', 'TaskOrderSchema', 'TaskOrderInputSchema',
-    'TaskOrderQuerySchema',
-    'UserSchema', 'UserWithScopesSchema','UserSchemaForAdmin', 'UserInputSchema', 'UserUpdateSchema', 'UserCreateResponseSchema', 'LoginResponseSchema', 'LoginSchema', 'WPLoginSchema',
-    'UserByEmailQuerySchema', 'UserByWPIDQuerySchema','UserQuerySchema',
-    'PasswordResetConfirmSchema', 'PasswordResetRequestMessageSchema', 'PasswordResetRequestSchema',
-    'CompanySchema', 'CompanyInputSchema', 'CompanyQuerySchema',
-    'OrganizationSchema', 'OrganizationInputSchema', 'OrganizationUpdateSchema','OrganizationTreeSchema','OrganizationQuerySchema'
-    'ObjectiveSchema', 'ObjectiveInputSchema', 'ObjectiveResponseSchema', 'ObjectivesListSchema',
-    'ProgressSchema', 'ProgressInputSchema',
-    'AccessScopeSchema', 'AccessScopeInputSchema',
-    'AuthorizedUserSchema', 'AccessUserSchema', 'OrgAccessSchema', 'AccessLevelInputSchema',
-    'AISuggestInputSchema', 'JobIdSchema', 'AIResultSchema',
-    'ObjectiveReminderSettingSchema',  'ObjectiveReminderSettingInputSchema','ObjectiveReminderSettingUpdateSchema',
-    'ObjectiveReminderSettingListOutputSchema', 'ObjectiveReminderLogOutputSchema',
-]
+

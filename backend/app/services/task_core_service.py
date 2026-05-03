@@ -39,7 +39,7 @@ def get_task_by_id(db_session:Session, task_id: int, user: User) -> Task:
     task, user_order = result  # タプルで返ってくるので分解
 
     # アクセス権チェック
-    if not check_task_access(db_session,user, task, TaskAccessLevelEnum.VIEW):
+    if not check_task_access(db_session,user, task.id, TaskAccessLevelEnum.VIEW):
         raise ServicePermissionError("このタスクを閲覧する権限がありません")
 
     # ユーザーごとの order を Task に反映
@@ -259,6 +259,8 @@ def update_objective_order(db_session: Session, task_id: int, data: dict[str, li
     new_order = data.get('order')
     if new_order is None:
         raise ServiceValidationError('orderフィールドが必要です')
+    if new_order == []:
+        raise ServiceValidationError('orderフィールドは空のリストを許可しません')
     objectives = db_session.query(Objective).filter_by(task_id=task_id).filter(Objective.is_deleted != True).all()
     obj_dict = {obj.id: obj for obj in objectives}
 

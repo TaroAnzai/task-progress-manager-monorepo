@@ -13,8 +13,8 @@ from app.services.group_member_service import (
     get_group_members,
     replace_group_members,
 )
-from backend.app.models import User
-from backend.app.service_errors import ServiceError, format_error_response
+from app.models import User
+from app.service_errors import ServiceError, format_error_response
 
 group_member_bp = Blueprint(
     "group_members",
@@ -45,5 +45,4 @@ class GroupMemberResource(MethodView):
         """グループメンバー全置換"""
         session = cast(Session, db.session)
         user = cast(User, current_user)
-        print("TEST")
         return replace_group_members(session, group_id, data["user_ids"], user)

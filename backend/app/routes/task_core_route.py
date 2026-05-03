@@ -21,7 +21,7 @@ from app.schemas import (
     StatusSchema,
     DeleteQuerySchema
 )
-from backend.app.models import User
+from app.models import User
 
 task_core_bp = Blueprint("Tasks", __name__, url_prefix="/tasks", description="タスク管理")
 

@@ -337,12 +337,17 @@ class AccessSubjectType(IntEnum):
     GROUP = auto()
 class AccessSubject(BaseModel):
     __tablename__ = "access_subject"
+    __table_args__ = (
+        UniqueConstraint("subject_type", "ref_id", name="uq_subject_type_ref_id"),
+    )
 
     subject_type: Mapped[AccessSubjectType] = mapped_column(IntEnumType(AccessSubjectType))
     ref_id: Mapped[int] = mapped_column()  # user_id / organization_id / group_id
 class TaskAccess(BaseModel):
     __tablename__ = "task_access"
-
+    __table_args__ = (
+        UniqueConstraint("task_id", "subject_id", name="uq_task_subject"),
+    )
     task_id: Mapped[int] = mapped_column(ForeignKey("task.id", ondelete="CASCADE"))
     subject_id: Mapped[int] = mapped_column(ForeignKey("access_subject.id", ondelete="CASCADE"))
 

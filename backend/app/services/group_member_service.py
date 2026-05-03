@@ -4,7 +4,7 @@ from sqlalchemy import select, delete
 from app.models import GroupMember, Group, GroupScopeType, User
 from typing import List
 
-from backend.app.service_errors import ServicePermissionError, ServiceValidationError
+from app.service_errors import ServicePermissionError, ServiceValidationError
 
 def _can_view_group(user: User, group: Group) -> bool:
     if user.is_superuser:

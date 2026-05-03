@@ -1,75 +1,75 @@
 # app/services/progress_updates_service.py
-from datetime import datetime
 from app.models import db, Objective, Task, ProgressUpdate, User
 from app.utils import check_task_access
-from app.constants import TaskAccessLevelEnum, StatusEnum, STATUS_LABELS
+from app.constants import TaskAccessLevelEnum, StatusEnum
 from app.service_errors import (
     ServiceValidationError,
     ServicePermissionError,
     ServiceNotFoundError,
 )
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
-def get_task_by_id(task_id):
+def _get_task_by_id(task_id:int) -> Task|None:
     return Task.query.filter_by(id=task_id, is_deleted=False).first()
 
 
-def get_task_by_id_with_deleted(task_id):
+def _get_task_by_id_with_deleted(task_id:int) -> Task|None:
     return db.session.get(Task, task_id)
 
 
-def get_objective_by_id(objective_id):
+def _get_objective_by_id(objective_id:int) -> Objective|None:
     return Objective.query.filter_by(id=objective_id, is_deleted=False).first()
 
 
-def get_objective_by_id_with_deleted(objective_id):
+def _get_objective_by_id_with_deleted(objective_id:int) -> Objective|None:
     return db.session.get(Objective, objective_id)
 
 
-def get_progress_by_id(progress_id):
+def _get_progress_by_id(progress_id:int) -> ProgressUpdate|None:
     return ProgressUpdate.query.filter_by(id=progress_id, is_deleted=False).first()
 
 
-def get_progress_by_id_with_deleted(progress_id):
+def _get_progress_by_id_with_deleted(progress_id:int) -> ProgressUpdate|None:
     return db.session.get(ProgressUpdate, progress_id)
 
 
-def add_progress(objective_id, data, user):
-    objective = get_objective_by_id(objective_id)
+def add_progress(db_session: Session, objective_id:int, data:dict, user:User):
+    objective = _get_objective_by_id(objective_id)
     if not objective:
         raise ServiceNotFoundError('オブジェクティブが見つかりません')
-    task = get_task_by_id(objective.task_id)
+    task = _get_task_by_id(objective.task_id)
     if not task:
         raise ServiceNotFoundError('タスクが見つかりません')
 
     if not (
-        check_task_access(user, task, TaskAccessLevelEnum.EDIT)
+        check_task_access(db_session, user, task.id, TaskAccessLevelEnum.EDIT)
         or user.id == objective.assigned_user_id
     ):
         raise ServicePermissionError('進捗追加の権限がありません')
 
-    progress = ProgressUpdate(
-        objective_id=objective_id,
-        status=data['status'],
-        detail=data['detail'],
-        report_date=data['report_date'],
-        updated_by=user.id
-    )
+    progress = ProgressUpdate()
+    progress.objective_id = objective_id
+    progress.status = data['status']
+    progress.detail = data['detail']
+    progress.report_date = data['report_date']
+    progress.updated_by = user.id
+    
     db.session.add(progress)
     db.session.commit()
     return {'message': '進捗を追加しました'}
 
 
-def get_progress_list(objective_id, user):
-    objective = get_objective_by_id(objective_id)
+def get_progress_list(db_session: Session, objective_id: int, user: User):
+    objective = _get_objective_by_id(objective_id)
     if not objective:
         raise ServiceNotFoundError('オブジェクティブが見つかりません')
 
-    task = get_task_by_id(objective.task_id)
+    task = _get_task_by_id(objective.task_id)
     if not task:
         raise ServiceNotFoundError('タスクが見つかりません')
 
-    if not check_task_access(user, task, TaskAccessLevelEnum.VIEW):
+    if not check_task_access(db_session, user, task.id, TaskAccessLevelEnum.VIEW):
         raise ServicePermissionError('閲覧権限がありません')
 
     progress_list = ProgressUpdate.query.filter_by(objective_id=objective_id, is_deleted=False).all()
@@ -97,16 +97,16 @@ def get_progress_list(objective_id, user):
 
 
 
-def get_latest_progress(objective_id, user):
-    objective = get_objective_by_id(objective_id)
+def get_latest_progress(db_session: Session, objective_id: int, user: User):
+    objective = _get_objective_by_id(objective_id)
     if not objective:
         raise ServiceNotFoundError('オブジェクティブが見つかりません')
 
-    task = get_task_by_id(objective.task_id)
+    task = _get_task_by_id(objective.task_id)
     if not task:
         raise ServiceNotFoundError('タスクが見つかりません')
 
-    if not check_task_access(user, task, TaskAccessLevelEnum.VIEW):
+    if not check_task_access(db_session, user, task.id, TaskAccessLevelEnum.VIEW):
         raise ServicePermissionError('閲覧権限がありません')
 
     progress = (
@@ -140,18 +140,18 @@ def get_latest_progress(objective_id, user):
         'detail': progress.detail
     }
 
-def delete_progress(progress_id, user, force = False):
-    progress = get_progress_by_id(progress_id)
+def delete_progress(db_session: Session, progress_id: int, user: User, force: bool = False):
+    progress = _get_progress_by_id(progress_id)
     if not progress:
         raise ServiceNotFoundError('進捗が見つかりません')
-    objective = get_objective_by_id_with_deleted(progress.objective_id)
+    objective = _get_objective_by_id_with_deleted(progress.objective_id)
     if not objective or objective.is_deleted:
         raise ServiceNotFoundError('オブジェクティブが見つかりません')
-    task = get_task_by_id_with_deleted(objective.task_id)
+    task = _get_task_by_id_with_deleted(objective.task_id)
     if not task or task.is_deleted:
         raise ServiceNotFoundError('タスクが見つかりません')
 
-    if not check_task_access(user, task, TaskAccessLevelEnum.EDIT):
+    if not check_task_access(db_session, user, task.id, TaskAccessLevelEnum.EDIT):
         raise ServicePermissionError('削除権限がありません')
     if force == True:
         try:

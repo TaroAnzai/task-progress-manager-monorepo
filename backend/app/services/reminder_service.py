@@ -4,11 +4,10 @@ from __future__ import annotations
 from datetime import datetime, timezone, time as dtime
 from typing import Any, Dict, Tuple, List, Optional
 
-from sqlalchemy import and_
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import Session, joinedload
 
 from app.extensions import db
-from app.models import ObjectiveReminderSetting, ObjectiveReminderLog
+from app.models import ObjectiveReminderSetting, ObjectiveReminderLog, User
 from app.models import Objective, Task, TaskAccessLevelEnum  # Task/Objective は実体に合わせて
 from app.utils import check_task_access
 from app.service_errors import (
@@ -17,7 +16,17 @@ from app.service_errors import (
     ServiceNotFoundError,
 )
 from app.reminder_constants import ReminderConditionEnum, ReminderFrequencyEnum
+from datetime import time as dtime
+from typing import Any, Dict, Optional
 
+from app.reminder_constants import ReminderConditionEnum, ReminderFrequencyEnum
+from app.service_errors import (
+    ServiceValidationError,
+    ServiceAuthenticationError,
+    ServicePermissionError,
+    ServiceNotFoundError,
+)
+from app.models import ObjectiveReminderSetting
 # ----------------------------
 # 内部ユーティリティ
 # ----------------------------
@@ -34,7 +43,7 @@ def _get_objective_or_404(objective_id: int) -> Objective:
 def _get_setting_or_404(setting_id: int) -> ObjectiveReminderSetting:
     setting = (
         db.session.query(ObjectiveReminderSetting)
-        .options(joinedload(ObjectiveReminderSetting.objective).joinedload(getattr(Objective, "task", None)))
+        .options(joinedload(ObjectiveReminderSetting.objective).joinedload(getattr(Objective, "task")))
         .filter(ObjectiveReminderSetting.id == setting_id)
         .first()
     )
@@ -48,27 +57,17 @@ def _get_task_from_objective(obj: Objective) -> Task:
         raise ServiceNotFoundError("Task not found")
     return task
 
-def _require_view_permission(user, objective: Objective):
+def _require_view_permission(db_session: Session,user: User, objective: Objective):
     task = _get_task_from_objective(objective)
-    if not (check_task_access(user, task, TaskAccessLevelEnum.VIEW) or user.id == getattr(objective, "assigned_user_id", None)):
+    if not (check_task_access(db_session, user, task.id, TaskAccessLevelEnum.VIEW) or user.id == getattr(objective, "assigned_user_id", None)):
         raise ServicePermissionError("You do not have permission to view this objective/reminders.")
 
-def _require_edit_or_assigned(user, objective: Objective):
+def _require_edit_or_assigned(db_session: Session, user: User, objective: Objective):
     task = _get_task_from_objective(objective)
-    if not (check_task_access(user, task, TaskAccessLevelEnum.EDIT) or user.id == getattr(objective, "assigned_user_id", None)):
+    if not (check_task_access(db_session, user, task.id, TaskAccessLevelEnum.EDIT) or user.id == getattr(objective, "assigned_user_id", None)):
         raise ServicePermissionError("You do not have permission to modify this objective/reminders.")
 
-from datetime import time as dtime
-from typing import Any, Dict, Optional
 
-from app.reminder_constants import ReminderConditionEnum, ReminderFrequencyEnum
-from app.service_errors import (
-    ServiceValidationError,
-    ServiceAuthenticationError,
-    ServicePermissionError,
-    ServiceNotFoundError,
-)
-from app.models import ObjectiveReminderSetting
 
 def _validate_business(
     payload: Dict[str, Any],
@@ -161,12 +160,12 @@ def _prevent_duplicate(objective_id: int, payload: Dict[str, Any], exclude_id: O
 # 公開サービス関数（route と同名）
 # ----------------------------
 
-def list_objective_reminders(objective_id: int, user) -> Tuple[Dict[str, Any], int]:
+def list_objective_reminders(db_session: Session, objective_id: int, user: User) -> Tuple[Dict[str, Any], int]:
     if not user or not getattr(user, "is_authenticated", False):
         raise ServicePermissionError("ログインが必要です")
 
     objective = _get_objective_or_404(objective_id)
-    _require_view_permission(user, objective)
+    _require_view_permission(db_session, user, objective)
 
     items: List[ObjectiveReminderSetting] = (
         db.session.query(ObjectiveReminderSetting)
@@ -180,12 +179,12 @@ def list_objective_reminders(objective_id: int, user) -> Tuple[Dict[str, Any], i
     }, 200
 
 
-def create_objective_reminder(objective_id: int, payload: Dict[str, Any], user) -> Tuple[ObjectiveReminderSetting, int]:
+def create_objective_reminder(db_session: Session, objective_id: int, payload: Dict[str, Any], user: User) -> Tuple[ObjectiveReminderSetting, int]:
     if not user or not getattr(user, "is_authenticated", False):
         raise ServicePermissionError("ログインが必要です")
 
     objective = _get_objective_or_404(objective_id)
-    _require_edit_or_assigned(user, objective)
+    _require_edit_or_assigned(db_session, user, objective)
 
     data = _validate_business(dict(payload))
     if "send_time_local" not in data or data["send_time_local"] is None:
@@ -193,38 +192,37 @@ def create_objective_reminder(objective_id: int, payload: Dict[str, Any], user) 
 
     _prevent_duplicate(objective_id, data)
 
-    setting = ObjectiveReminderSetting(
-        objective_id=objective_id,
-        condition_type=data["condition_type"],
-        threshold_days=data.get("threshold_days"),
-        frequency_type=data["frequency_type"],
-        interval_days=data.get("interval_days"),
-        send_time_local=data["send_time_local"],
-        is_active=bool(data.get("is_active", True)),
-        last_sent_at=None,
-        created_at=_utcnow(),
-        updated_at=_utcnow(),
-    )
+    setting = ObjectiveReminderSetting()
+    setting.objective_id = objective_id
+    setting.condition_type = data["condition_type"]
+    setting.threshold_days = data.get("threshold_days")
+    setting.frequency_type = data["frequency_type"]
+    setting.interval_days = data.get("interval_days")
+    setting.send_time_local = data["send_time_local"]
+    setting.is_active = bool(data.get("is_active", True))
+    setting.last_sent_at = None
+    setting.created_at = _utcnow()
+    setting.updated_at = _utcnow()
     db.session.add(setting)
     db.session.commit()
     return setting, 201
 
 
-def get_reminder(setting_id: int, user) -> Tuple[ObjectiveReminderSetting, int]:
+def get_reminder(db_session: Session, setting_id: int, user: User) -> Tuple[ObjectiveReminderSetting, int]:
     if not user or not getattr(user, "is_authenticated", False):
         raise ServicePermissionError("ログインが必要です")
 
     setting = _get_setting_or_404(setting_id)
-    _require_view_permission(user, setting.objective)
+    _require_view_permission(db_session, user, setting.objective)
     return setting, 200
 
 
-def update_reminder(setting_id: int, payload: Dict[str, Any], user) -> Tuple[ObjectiveReminderSetting, int]:
+def update_reminder(db_session: Session, setting_id: int, payload: Dict[str, Any], user: User) -> Tuple[ObjectiveReminderSetting, int]:
     if not user or not getattr(user, "is_authenticated", False):
         raise ServicePermissionError("ログインが必要です")
     print("payload",payload)
     setting = _get_setting_or_404(setting_id)
-    _require_edit_or_assigned(user, setting.objective)
+    _require_edit_or_assigned(db_session, user, setting.objective)
 
     data = _validate_business(dict(payload), existing=setting)
     print("data",data)
@@ -241,12 +239,12 @@ def update_reminder(setting_id: int, payload: Dict[str, Any], user) -> Tuple[Obj
     return setting, 200
 
 
-def delete_reminder(setting_id: int, user) -> Tuple[Dict[str, Any], int]:
+def delete_reminder(db_session: Session, setting_id: int, user: User) -> Tuple[Dict[str, Any], int]:
     if not user or not getattr(user, "is_authenticated", False):
         raise ServicePermissionError("ログインが必要です")
 
     setting = _get_setting_or_404(setting_id)
-    _require_edit_or_assigned(user, setting.objective)
+    _require_edit_or_assigned(db_session, user, setting.objective)
 
     # 履歴が存在する場合は削除禁止 → 無効化を案内（FK 制約の可能性も考慮）
     has_logs = (

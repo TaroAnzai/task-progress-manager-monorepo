@@ -4,9 +4,9 @@ from sqlalchemy import and_, or_, select
 from app.models import Group, GroupMember, GroupScopeType, User
 from typing import Any
 
-from backend.app.constants import OrgRoleEnum
-from backend.app.service_errors import ServicePermissionError, ServiceValidationError
-from backend.app.utils import check_org_access
+from app.constants import OrgRoleEnum
+from app.service_errors import ServicePermissionError, ServiceValidationError
+from app.utils import check_org_access
 
 
 def list_groups(db_session: Session, current_user: User):
