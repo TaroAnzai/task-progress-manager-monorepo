@@ -355,7 +355,7 @@ class TaskAccess(BaseModel):
 class Group(BaseModel, SoftDeleteMixin):
     __tablename__ = "group"
 
-    name: Mapped[str]
+    name: Mapped[str]= mapped_column(String(255))
 
     owner_user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
     members: Mapped[list["GroupMember"]] = relationship(back_populates="group")
