@@ -45,6 +45,14 @@ class GroupCreateSchema(Schema):
             "example": 10
         }
     )
+    member_user_ids = fields.List(
+        fields.Int(),
+        required=True,
+        metadata={
+            "description": "メンバーのユーザーIDリスト",
+            "example": [1, 2, 3]
+        }
+    )
 
     @validates_schema
     def validate_scope(self, data:dict[str, Any], **kwargs:Any) -> None:
@@ -63,7 +71,6 @@ class GroupCreateSchema(Schema):
         else:
             # PRIVATE / GLOBAL の場合は organization_id を使わない
             data["organization_id"] = None
-
 
 # =====================
 # Group 更新

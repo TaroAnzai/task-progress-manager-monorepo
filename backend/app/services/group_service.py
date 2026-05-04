@@ -126,6 +126,10 @@ def delete_group(db_session: Session, group_id: int, current_user: User):
 
     if current_user.is_superuser is False and group.owner_user_id != current_user.id:
         raise ServicePermissionError("Only superusers or the group owner can delete the group")
-
+    
+    db_session.query(GroupMember)\
+        .filter(GroupMember.group_id == group_id)\
+        .delete(synchronize_session=False)
+    
     db_session.delete(group)
     db_session.commit()
