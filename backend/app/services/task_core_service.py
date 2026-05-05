@@ -1,9 +1,9 @@
-from typing import Any
+from typing import Any, List, Optional
 
-from flask import current_app
-from sqlalchemy.orm import Session
 from datetime import datetime
-from app.models import AccessSubject, AccessSubjectType, GroupMember, TaskAccess, User, Task, Objective, UserTaskOrder, TaskAccessUser, TaskAccessOrganization
+from app.models import (AccessSubject, AccessSubjectType, GroupMember,
+                         TaskAccess, User, Task, Objective, UserTaskOrder,
+)
 from app.utils import check_task_access
 from app.constants import TaskAccessLevelEnum, StatusEnum, STATUS_LABELS
 from app.service_errors import (
@@ -12,48 +12,89 @@ from app.service_errors import (
     ServiceAuthenticationError,
     ServiceNotFoundError,
 )
-from sqlalchemy import and_, exists, or_, case, select
-from sqlalchemy.orm import joinedload
+from sqlalchemy import Integer, and_, cast, exists, or_, case, select, func, delete
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
+from dataclasses import dataclass
 
 
-def get_task_by_id(db_session:Session, task_id: int, user: User) -> Task:
-    # Task と UserTaskOrder を join
-    result = (
-        db_session.query(Task, UserTaskOrder.display_order.label("user_order"))
-        .outerjoin(
-            UserTaskOrder,
+
+def get_task_by_id(db_session: Session, task_id: int, user: User) -> Task:
+    """
+    特定のタスクをIDで取得する。
+    1. 存在チェック（Soft Delete考慮）
+    2. 権限チェック（作成者 or アクセス権付与）
+    3. ユーザー固有の表示順と実行権限の付与
+    を、N+1を回避しつつSQL 2.0スタイルで実行する。
+    """
+    if not user or not user.is_authenticated:
+        raise ServiceAuthenticationError('ログインが必要です')
+
+    # 1. ユーザーの所属コンテキスト（所属組織・グループ）を解決
+    # ※ get_tasksで定義した共通関数を使用
+    context = _resolve_user_access_context(db_session, user)
+
+    # 2. 権限計算用のサブクエリ（対象タスクのみに絞り込み）
+    access_subq = (
+        select(
+            TaskAccess.task_id,
+            func.max(cast(TaskAccess.access_level, Integer)).label("max_level")
+        )
+        .where(
             and_(
-                UserTaskOrder.task_id == Task.id,
-                UserTaskOrder.user_id == user.id
+                TaskAccess.task_id == task_id,
+                TaskAccess.subject_id.in_(context.subject_ids)
             )
         )
-        .options(joinedload(Task.objective))
-        .filter(Task.id == task_id, Task.is_deleted != True)
-        .first()
+        .group_by(TaskAccess.task_id)
+    ).subquery()
+
+    # 3. メインクエリの構築
+    stmt = (
+        select(
+            Task,
+            # 作成者ならFULL、それ以外は付与された最大権限
+            case(
+                (Task.created_by == user.id, TaskAccessLevelEnum.FULL.value),
+                else_=access_subq.c.max_level
+            ).label("effective_access_level"),
+            UserTaskOrder.display_order.label("user_order")
+        )
+        .options(joinedload(Task.objective))  # N+1回避
+        .outerjoin(access_subq, Task.id == access_subq.c.task_id)
+        .outerjoin(
+            UserTaskOrder,
+            and_(UserTaskOrder.task_id == Task.id, UserTaskOrder.user_id == user.id)
+        )
+        .where(
+            and_(
+                Task.id == task_id,
+                Task.is_deleted == False
+            )
+        )
     )
 
+    # 4. 実行とバリデーション
+    result = db_session.execute(stmt).first()
+
+    # A. そもそもデータが存在しない（または削除済み）場合
     if not result:
         raise ServiceNotFoundError("タスクが見つかりません")
 
-    task, user_order = result  # タプルで返ってくるので分解
+    task = result.Task
 
-    # アクセス権チェック
-    if not check_task_access(db_session,user, task.id, TaskAccessLevelEnum.VIEW):
+    # B. 権限チェック
+    # 作成者でもなく、どのSubject（個人・組織・班）経由でも権限がない場合
+    if result.effective_access_level is None:
         raise ServicePermissionError("このタスクを閲覧する権限がありません")
-
-    # ユーザーごとの order を Task に反映
-    if user_order is not None:
-        task.display_order = user_order
-
-    # アクセスレベルを計算
-    task.user_access_level = _calc_user_access_level(db_session, task, user)
+    effective_level = TaskAccessLevelEnum(result.effective_access_level)
+    
+    # 5. 取得した動的属性をインスタンスにセット
+    task.user_access_level = effective_level
+    if result.user_order is not None:
+        task.display_order = result.user_order
 
     return task
-
-
-def get_task_by_id_with_deleted(db_session: Session, task_id: int) -> Task|None:
-    return db_session.get(Task, task_id)
 
 def create_task(db_session: Session, data:dict[str, str], user: User):
     title = data.get('title')
@@ -134,13 +175,21 @@ def delete_task(db_session: Session, task_id: int, user: User, force: bool = Fal
             raise ServiceValidationError('このタスクは関連するオブジェクティブが存在するため、完全に削除できません。')
 
         try:
-            orders = db_session.query(UserTaskOrder).filter_by(task_id=task_id).all()
-            for order in orders:
-                db_session.delete(order)
-            db_session.flush()
-            db_session.query(TaskAccessUser).filter_by(task_id=task_id).delete()
-            db_session.query(TaskAccessOrganization).filter_by(task_id=task_id).delete()
+    # --- UserTaskOrderを一括削除 ---
+            db_session.execute(
+                delete(UserTaskOrder)
+                .where(UserTaskOrder.task_id == task_id)
+            )
+
+            # --- TaskAccessを一括削除 ---
+            db_session.execute(
+                delete(TaskAccess)
+                .where(TaskAccess.task_id == task_id)
+            )
+
+            # --- Task削除（ORMインスタンス前提） ---
             db_session.delete(task)
+
             db_session.commit()
         except IntegrityError as e:
             db_session.rollback()
@@ -149,109 +198,123 @@ def delete_task(db_session: Session, task_id: int, user: User, force: bool = Fal
         task.soft_delete()
         db_session.commit()
 
-def get_tasks(db_session: Session, user: User) -> list[Task]:
-    current_app.logger.info("[START] get_tasks called")
 
+
+
+@dataclass(frozen=True)
+class UserAccessContext:
+    """ユーザーが保持するアクセス権のコンテキスト（対象IDの集合）"""
+    user_id: int
+    organization_id: Optional[int]
+    group_ids: List[int]
+    # 解決されたAccessSubject.idのリスト
+    subject_ids: List[int]
+
+def _resolve_user_access_context(db_session: Session, user: User) -> UserAccessContext:
+    """ユーザーの所属（組織・グループ）から関連するAccessSubjectのIDをすべて解決する"""
+    
+    # 1. ユーザー自身のグループ所属を取得
+    group_ids = db_session.scalars(
+        select(GroupMember.group_id).where(GroupMember.user_id == user.id)
+    ).all()
+
+    # 2. 関連するSubject(USER, ORGANIZATION, GROUP)のIDをまとめて取得
+    # subject_typeとref_idのペアで、自分に関係する行を特定
+    subject_conditions = [
+        and_(AccessSubject.subject_type == AccessSubjectType.USER, AccessSubject.ref_id == user.id)
+    ]
+    if user.organization_id:
+        subject_conditions.append(
+            and_(AccessSubject.subject_type == AccessSubjectType.ORGANIZATION, AccessSubject.ref_id == user.organization_id)
+        )
+    if group_ids:
+        subject_conditions.append(
+            and_(AccessSubject.subject_type == AccessSubjectType.GROUP, AccessSubject.ref_id.in_(group_ids))
+        )
+
+    subject_ids = db_session.scalars(
+        select(AccessSubject.id).where(or_(*subject_conditions))
+    ).all()
+
+    return UserAccessContext(
+        user_id=user.id,
+        organization_id=user.organization_id,
+        group_ids=list(group_ids),
+        subject_ids=list(subject_ids)
+    )
+
+def get_tasks(db_session: Session, user: User) -> List[Task]:
+    """
+    ユーザーがアクセス可能なタスク一覧を取得する。
+    N+1問題を回避し、SQL側で権限の最大値計算とフィルタリングを完結させる。
+    """
     if not user or not user.is_authenticated:
         raise ServiceAuthenticationError('ログインが必要です')
 
-    org_id = user.organization_id
-    user_id = user.id
+    # 1. アクセスコンテキストの解決
+    context = _resolve_user_access_context(db_session, user)
 
-    filter_conditions = [
-        Task.created_by == user_id,
-        Task.id.in_(
-            db_session.query(TaskAccessUser.task_id)
-            .filter(TaskAccessUser.user_id == user_id)
-            .filter(TaskAccessUser.access_level.in_([
-                TaskAccessLevelEnum.VIEW,
-                TaskAccessLevelEnum.EDIT,
-                TaskAccessLevelEnum.FULL,
-            ]))
-        ),
-        Task.id.in_(
-            db_session.query(TaskAccessOrganization.task_id)
-            .filter(TaskAccessOrganization.organization_id == org_id)
-            .filter(
-                TaskAccessOrganization.access_level.in_([
-                    TaskAccessLevelEnum.VIEW,
-                    TaskAccessLevelEnum.EDIT,
-                    TaskAccessLevelEnum.FULL,
-                ])
-            )
+    # 2. タスクごとの最大アクセスレベルを計算するサブクエリ
+    # ユーザーが直接・組織・グループ経由で持つ権限のうち、最大のものを抽出
+    # また、作成者(created_by)の場合は強制的にFULL権限とする
+    access_subq = (
+        select(
+            TaskAccess.task_id,
+            func.max(cast(TaskAccess.access_level, Integer)).label("max_level")
         )
-    ]
+        .where(TaskAccess.subject_id.in_(context.subject_ids))
+        .group_by(TaskAccess.task_id)
+    ).subquery()
 
-    visible_tasks = (
-        db_session.query(Task, UserTaskOrder.display_order.label('user_order'))
-        .outerjoin(UserTaskOrder, and_(
-            UserTaskOrder.task_id == Task.id,
-            UserTaskOrder.user_id == user_id
-        ))
-        .options(joinedload(Task.objective)) 
-        .filter(
+    # 3. メインクエリの構築
+    stmt = (
+        select(
+            Task,
+            # 作成者ならFULL、そうでなければサブクエリから取得した最大権限を適用
+            case(
+                (Task.created_by == user.id, TaskAccessLevelEnum.FULL.value),
+                else_=access_subq.c.max_level
+            ).label("effective_access_level"),
+            UserTaskOrder.display_order.label("user_order")
+        )
+        # 権限サブクエリとの結合（作成者自身、または権限設定があるタスクのみ）
+        .outerjoin(access_subq, Task.id == access_subq.c.task_id)
+        # ユーザー固有の並び順を結合
+        .outerjoin(
+            UserTaskOrder, 
+            and_(UserTaskOrder.task_id == Task.id, UserTaskOrder.user_id == user.id)
+        )
+        .where(
             and_(
-                Task.is_deleted != True,
-                or_(*filter_conditions)
+                Task.is_deleted == False,
+                or_(
+                    Task.created_by == user.id,          # 自分が作った
+                    access_subq.c.max_level.is_not(None) # 何らかの閲覧権限が付与されている
+                )
             )
         )
         .order_by(
-            case((UserTaskOrder.display_order == None, 1), else_=0),  # NULLは後ろへ
+            case((UserTaskOrder.display_order.is_(None), 1), else_=0),
             UserTaskOrder.display_order.asc(),
-            case((Task.display_order == None, 1), else_=0),
+            case((Task.display_order.is_(None), 1), else_=0),
             Task.display_order.asc()
         )
-        .all()
     )
 
-    result = []
-    for task, user_order in visible_tasks:
-        task.user_access_level = _calc_user_access_level(db_session, task, user)
-        task.display_order = user_order if user_order is not None else task.display_order
-        result.append(task)
-    return result
+    # 4. 実行と結果の加工
+    results = db_session.execute(stmt).all()
 
-def _calc_user_access_level(db_session: Session, task: Task, user: User) -> TaskAccessLevelEnum:
-    if task.created_by == user.id:
-        return TaskAccessLevelEnum.FULL
-     # TaskAccess + Subject をJOINで取得
-    stmt = (
-        select(TaskAccess, AccessSubject)
-        .join(AccessSubject, TaskAccess.subject_id == AccessSubject.id)
-        .where(TaskAccess.task_id == task.id)
-    )
+    final_tasks = []
+    for row in results:
+        task = row.Task
 
-    rows= db_session.execute(stmt).tuples().all()
 
-    # ユーザーの所属グループを事前取得
-    group_ids = set(
-        db_session.scalars(
-            select(GroupMember.group_id).where(GroupMember.user_id == user.id)
-        ).all()
-    )
-
-    best_scope = None
-
-    for access, subject in rows:
-
-        if subject.subject_type == AccessSubjectType.USER:
-            if subject.ref_id == user.id:
-                best_scope = _max_scope(best_scope, access.access_level)
-
-        elif subject.subject_type == AccessSubjectType.ORGANIZATION:
-            if subject.ref_id == user.organization_id:
-                best_scope = _max_scope(best_scope, access.access_level)
-
-        elif subject.subject_type == AccessSubjectType.GROUP:
-            if subject.ref_id in group_ids:
-                best_scope = _max_scope(best_scope, access.access_level)
-
-    return best_scope or TaskAccessLevelEnum.VIEW
-def _max_scope(a: TaskAccessLevelEnum | None, b: TaskAccessLevelEnum) -> TaskAccessLevelEnum:
-    if a is None:
-        return b
-    return a if a.value >= b.value else b
-
+        # クエリで計算した権限と表示順をエンティティにセット
+        task.user_access_level = TaskAccessLevelEnum(row.effective_access_level)
+        if row.user_order is not None:
+            task.display_order = row.user_order
+        final_tasks.append(task)
+    return final_tasks
 
 
 

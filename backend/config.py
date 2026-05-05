@@ -53,7 +53,7 @@ class Config:
     OPENAPI_URL_PREFIX = os.getenv("OPENAPI_URL_PREFIX", "/doc")
     OPENAPI_JSON_PATH = os.getenv("OPENAPI_JSON_PATH", "openapi.json")
     OPENAPI_REDOC_PATH = os.getenv("OPENAPI_REDOC_PATH", "/redoc")
-    OPENAPI_REDOC_URL = os.getenv("OPENAPI_REDOC_URL", "https://cdn.jsdelivr.net/npm/redoc@next/bundles/redoc.standalone.js")
+    OPENAPI_REDOC_URL = os.getenv("OPENAPI_REDOC_URL","https://cdn.jsdelivr.net/npm/redoc@2/bundles/redoc.standalone.js")
     OPENAPI_SWAGGER_UI_PATH = os.getenv("OPENAPI_SWAGGER_UI_PATH", "/swagger-ui")
     OPENAPI_SWAGGER_UI_URL = os.getenv(
         "OPENAPI_SWAGGER_UI_URL",
