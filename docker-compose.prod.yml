@@ -6,9 +6,8 @@ services:
       - "5001:5000"
     environment:
       - FLASK_ENV=production
-    depends_on:
-      - db
-      - redis
+    env_file:
+      - ./backend/.env.prod
     restart: always
 
   frontend:
@@ -19,8 +18,8 @@ services:
 
   celery_worker:
     build: ./backend
-    command: celery -A app.celery worker -Q progress_mail -n progress_mail@%h -c 2
-      -l info
+    command: celery -A app.celery_app.celery worker -Q progress_mail -n
+      progress_mail@%h -c 2 -l info
     env_file:
       - ./backend/.env.prod
 
