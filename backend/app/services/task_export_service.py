@@ -2,28 +2,26 @@
 
 import io
 import pandas as pd
+from openpyxl.worksheet.worksheet import Worksheet
 import yaml
-from sqlalchemy import and_, or_, case
+from sqlalchemy.orm import Session
 from app.models import (
-    db,
-    Task,
     Objective,
     ProgressUpdate,
     User,
-    TaskAccessUser,
-    TaskAccessOrganization,
-    UserTaskOrder,
 )
-from app.constants import TaskAccessLevelEnum, StatusEnum, STATUS_LABELS
+from app.constants import StatusEnum, STATUS_LABELS
+from app.service_errors import ServiceAuthenticationError
+from app.services.task_core_service import build_accessible_tasks_query
 
 
 class ProgressFormatter:
-    def __init__(self, db_session):
-        self.db = db_session
+    def __init__(self, db_session:Session):
+        self.db_session = db_session
 
-    def list_for_objective(self, objective_id):
+    def list_for_objective(self, objective_id:int):
         progresses = (
-            self.db.session.query(ProgressUpdate)
+            self.db_session.query(ProgressUpdate)
             .filter_by(objective_id=objective_id, is_deleted=False)
             .order_by(ProgressUpdate.report_date.asc())
             .all()
@@ -37,8 +35,8 @@ class ProgressFormatter:
             })
         return result
 
-    def _get_user_name(self, user_id):
-        user = self.db.session.get(User, user_id)
+    def _get_user_name(self, user_id:int|None):
+        user = self.db_session.get(User, user_id)
         return user.name if user else ""
 
 
@@ -46,13 +44,13 @@ from app.constants import StatusEnum, STATUS_LABELS
 from app.models import Objective, User
 
 class ObjectiveFormatter:
-    def __init__(self, db_session):
-        self.db = db_session
+    def __init__(self, db_session:Session):
+        self.db_session = db_session
         self.progress_formatter = ProgressFormatter(db_session)
 
-    def list_for_task(self, task_id):
+    def list_for_task(self, task_id:int):
         objectives = (
-            self.db.session.query(Objective)
+            self.db_session.query(Objective)
             .filter_by(task_id=task_id, is_deleted=False)
             .order_by(Objective.display_order.asc())
             .all()
@@ -68,98 +66,45 @@ class ObjectiveFormatter:
             })
         return result
 
-    def _get_status_label(self, status):
+    def _get_status_label(self, status:StatusEnum):
         try:
             return STATUS_LABELS.get(StatusEnum(status), "")
         except ValueError:
             return ""
 
-    def _get_user_name(self, user_id):
+    def _get_user_name(self, user_id:int|None):
         if not user_id:
             return ""  # ユーザー未割り当てなら空文字を返す
-        user = self.db.session.get(User, user_id)
+        user = self.db_session.get(User, user_id)
         return user.name if user else ""
 
 
 
 class TaskDataExporter:
-    def __init__(self, user_id, db_session):
-        self.user_id = user_id
-        self.db = db_session
+    def __init__(self, user:User, db_session:Session):
+        self.user = user
+        self.db_session = db_session
         self.objective_formatter = ObjectiveFormatter(db_session)
-
-    def get_user(self):
-        return self.db.session.get(User, self.user_id)
     
-    def _get_status_name(self, status):
+    def _get_status_name(self, status:StatusEnum):
         try:
             return STATUS_LABELS.get(StatusEnum(status), "")
         except ValueError:
             return ""
 
-    def _get_user_name(self, user_id):
-        user = self.db.session.get(User, user_id)
+    def _get_user_name(self, user_id:int):
+        user = self.db_session.get(User, user_id)
         return user.name if user else ""
 
     def get_tasks(self):
-        user = self.get_user()
-        if not user:
-            return []
+        if not self.user or not self.user.is_authenticated:
+            raise ServiceAuthenticationError('ログインが必要です')
+        stmt = build_accessible_tasks_query(self.db_session, self.user)
 
-        filter_conditions = [
-            Task.created_by == self.user_id,
-            Task.id.in_(
-                db.session.query(TaskAccessUser.task_id)
-                .filter(TaskAccessUser.user_id == self.user_id)
-                .filter(
-                    TaskAccessUser.access_level.in_([
-                        TaskAccessLevelEnum.VIEW,
-                        TaskAccessLevelEnum.EDIT,
-                        TaskAccessLevelEnum.FULL,
-                    ])
-                )
-            ),
-        ]
+        # 4. 実行と結果の加工
+        results = self.db_session.execute(stmt).all()
 
-        if user.organization_id:
-            filter_conditions.append(
-                Task.id.in_(
-                    db.session.query(TaskAccessOrganization.task_id)
-                    .filter(TaskAccessOrganization.organization_id == user.organization_id)
-                    .filter(
-                        TaskAccessOrganization.access_level.in_([
-                            TaskAccessLevelEnum.VIEW,
-                            TaskAccessLevelEnum.EDIT,
-                            TaskAccessLevelEnum.FULL,
-                        ])
-                    )
-                )
-            )
-            # 組織に直接属するタスクも追加
-            filter_conditions.append(Task.organization_id == user.organization_id)
-
-        result = (
-            db.session.query(Task, UserTaskOrder.display_order.label('user_order'))
-            .outerjoin(UserTaskOrder, and_(
-                UserTaskOrder.task_id == Task.id,
-                UserTaskOrder.user_id == self.user_id 
-            ))
-            .filter(
-                and_(
-                    Task.is_deleted != True,
-                    or_(*filter_conditions)
-                )
-            )
-            .order_by(
-                case((UserTaskOrder.display_order.is_(None), 1), else_=0),  # NULLを後ろへ
-                UserTaskOrder.display_order.asc(),
-                case((Task.display_order.is_(None), 1), else_=0),           # こちらもNULL後ろ
-                Task.display_order.asc(),
-            )
-            .all()
-        )
-
-        return [tup[0] for tup in result]
+        return [tup[0] for tup in results]
 
     def build_nested_export_data(self):
         tasks = self.get_tasks()
@@ -190,7 +135,7 @@ class TaskDataExporter:
         return yaml.dump(data, allow_unicode=True, sort_keys=False)
 
     def build_flat_rows_for_excel(self):
-        user = self.get_user()
+        user = self.user
         tasks = self.get_tasks()
         rows = []
 
@@ -223,11 +168,12 @@ class TaskDataExporter:
 
         return rows
 
-    def apply_excel_formatting(self, worksheet):
+    def apply_excel_formatting(self, worksheet:Worksheet):
         from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+        from openpyxl.utils import get_column_letter
         col_widths = [12, 68, 11, 11, 11, 57, 11, 11]
         for i, width in enumerate(col_widths, start=1):
-            col_letter = worksheet.cell(row=1, column=i).column_letter
+            col_letter = get_column_letter(i)
             worksheet.column_dimensions[col_letter].width = width
         worksheet.column_dimensions['A'].hidden = True
         wrap_columns = [2, 6]
@@ -252,6 +198,6 @@ class TaskDataExporter:
                     cell.fill = header_fill
                     cell.alignment = Alignment(horizontal='center')
                     cell.border = thin_border
-                elif row_type.startswith("objective"):
+                elif isinstance(row_type, str) and row_type.startswith("objective"):
                     cell.border = thin_border
                     cell.alignment = Alignment(vertical='top', wrap_text=(col_idx in wrap_columns))

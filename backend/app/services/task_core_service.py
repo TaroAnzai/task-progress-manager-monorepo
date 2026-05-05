@@ -242,15 +242,14 @@ def _resolve_user_access_context(db_session: Session, user: User) -> UserAccessC
         group_ids=list(group_ids),
         subject_ids=list(subject_ids)
     )
-
-def get_tasks(db_session: Session, user: User) -> List[Task]:
+def build_accessible_tasks_query(db_session: Session, user: User):
     """
-    ユーザーがアクセス可能なタスク一覧を取得する。
+    ユーザーがアクセス可能なタスク一覧を取得するクエリーを返す
     N+1問題を回避し、SQL側で権限の最大値計算とフィルタリングを完結させる。
+    row.Task:Task
+    row.effective_access_level:int TaskAccessLevelEnumのvalue
+    row.user_order:int UserTaskOrder.display_order
     """
-    if not user or not user.is_authenticated:
-        raise ServiceAuthenticationError('ログインが必要です')
-
     # 1. アクセスコンテキストの解決
     context = _resolve_user_access_context(db_session, user)
 
@@ -301,13 +300,24 @@ def get_tasks(db_session: Session, user: User) -> List[Task]:
         )
     )
 
+    return stmt
+
+
+def get_tasks(db_session: Session, user: User) -> List[Task]:
+    """
+    ユーザーがアクセス可能なタスク一覧を取得する。
+    N+1問題を回避し、SQL側で権限の最大値計算とフィルタリングを完結させる。
+    """
+    if not user or not user.is_authenticated:
+        raise ServiceAuthenticationError('ログインが必要です')
+    stmt = build_accessible_tasks_query(db_session, user)
+
     # 4. 実行と結果の加工
     results = db_session.execute(stmt).all()
 
     final_tasks = []
     for row in results:
         task = row.Task
-
 
         # クエリで計算した権限と表示順をエンティティにセット
         task.user_access_level = TaskAccessLevelEnum(row.effective_access_level)

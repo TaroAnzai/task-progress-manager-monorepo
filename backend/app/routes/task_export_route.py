@@ -1,10 +1,12 @@
+from typing import cast
+
 from flask_smorest import Blueprint
 from flask.views import MethodView
 from flask import send_file
 from flask_login import login_required, current_user
-
+from sqlalchemy.orm import Session, joinedload
 from app.services.task_export_service import TaskDataExporter
-from app.models import db
+from app.models import User, db
 from app.schemas import YAMLResponseSchema, ErrorResponseSchema
 from app.service_errors import ServiceError
 from app.decorators import with_common_error_responses
@@ -33,7 +35,9 @@ class ExportExcelResource(MethodView):
     @task_export_bp.doc(responses={200: excel_download_doc})
     def get(self):
         """タスクをExcelでエクスポート"""
-        exporter = TaskDataExporter(current_user.id, db)
+        session = cast(Session, db.session)
+        user = cast(User, current_user)
+        exporter = TaskDataExporter(user, session)
         file = exporter.export_as_excel()
         return send_file(
             file,
@@ -49,7 +53,9 @@ class ExportYAMLResource(MethodView):
     @with_common_error_responses(task_export_bp)
     def get(self):
         """タスクをYAMLでエクスポート"""
-        exporter = TaskDataExporter(current_user.id, db)
+        session = cast(Session, db.session)
+        user = cast(User, current_user)
+        exporter = TaskDataExporter(user, session)
         yaml_data = exporter.export_as_yaml()
         return {"yaml": yaml_data}
 

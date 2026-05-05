@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, exists, and_, or_
 from .models import (
     AccessSubject, 
-    AccessSubjectType, GroupMember, TaskAccess, db, TaskAccessUser, TaskAccessOrganization, Organization, User, Task)
+    AccessSubjectType, GroupMember, TaskAccess, db, Organization, User, Task)
 from .constants import OrgRoleEnum, TaskAccessLevelEnum
 from .constants import (
     TaskAccessLevelEnum,
@@ -53,48 +53,6 @@ def get_descendant_organizations(root_id, all_orgs):
     recurse(root_id)
     return descendants
 
-def can_view_task(user, task):
-    """
-    ユーザーが指定されたタスクを閲覧可能かどうかを判定する
-    """
-    if task.created_by == user.id:
-        return True
-
-    if any(s.role == OrgRoleEnum.SYSTEM_ADMIN for s in user.access_scopes):
-        return True
-
-    if any(s.role == OrgRoleEnum.ORG_ADMIN for s in user.access_scopes):
-        all_orgs = Organization.query.all()
-        descendant_orgs = get_descendant_organizations(user.organization_id, all_orgs)
-        descendant_ids = [org.id for org in descendant_orgs]
-        if task.organization_id in descendant_ids:
-            return True
-
-    user_scope = db.session.query(TaskAccessUser).filter_by(task_id=task.id, user_id=user.id).first()
-    org_scope = db.session.query(TaskAccessOrganization).filter_by(task_id=task.id, organization_id=user.organization_id).first()
-
-    if user_scope or org_scope:
-        return True
-
-    return False
-
-def can_edit_task(user, task):
-    """
-    ユーザーが指定されたタスクを編集可能かどうかを判定する
-    """
-    if task.created_by == user.id:
-        return True
-
-    if any(s.role == OrgRoleEnum.SYSTEM_ADMIN for s in user.access_scopes):
-        return True
-
-    if any(s.role == OrgRoleEnum.ORG_ADMIN for s in user.access_scopes):
-        all_orgs = Organization.query.all()
-        descendant_orgs = get_descendant_organizations(user.organization_id, all_orgs)
-        descendant_ids = [org.id for org in descendant_orgs]
-        return task.organization_id in descendant_ids
-
-    return False
 
 def check_task_access(
     db_session: Session,

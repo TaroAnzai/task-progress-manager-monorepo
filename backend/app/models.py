@@ -243,7 +243,7 @@ class Task(BaseModel, SoftDeleteMixin):
         default=lambda: datetime.now(UTC)
     )
 
-    display_order: Mapped[Optional[int]] = mapped_column()
+    display_order: Mapped[Optional[int]] = mapped_column() # NOT USE
 
     organization_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("organization.id")

@@ -1,5 +1,8 @@
+from typing import Required
+
 from marshmallow import Schema, fields, ValidationError
 from marshmallow_sqlalchemy import SQLAlchemyAutoSchema
+from sqlalchemy import Integer
 from app.models import Task
 from app.constants import StatusEnum, TaskAccessLevelEnum
 from app import db
@@ -18,7 +21,8 @@ class TaskSchema(SQLAlchemyAutoSchema):
                        metadata={"type": "string", "enum": [e.name for e in StatusEnum]})
     create_user_name = fields.Method("get_creator_name", dump_only=True,metadata={"type": "string", "description": "タスク作成者の名前"}) 
     has_assigned_objective = fields.Method("get_has_assigned_objective", dump_only=True, metadata={"type":"boolean", "description": "オブジェクティブにアサインされているか"})
-
+    display_order = fields.Integer(allow_none=True)
+    
     def get_has_assigned_objective(self, obj):
         # obj.objectives が eager load 済み
         return any(
