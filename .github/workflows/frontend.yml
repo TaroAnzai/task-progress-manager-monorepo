@@ -42,7 +42,7 @@ jobs:
         working-directory: frontend
         run: npm run generate:api
         env:
-          VITE_OPENAPI_URL: https://api.anzai-home.com/progress/openapi.json
+          VITE_OPENAPI_URL: https://api.anzai-home.com/progress-dev/api/doc/openapi.json
 
       # ---------------------------
       # Build
