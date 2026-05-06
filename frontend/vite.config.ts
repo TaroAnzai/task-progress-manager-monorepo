@@ -1,5 +1,4 @@
 import react from '@vitejs/plugin-react';
-import fs from 'fs';
 import path from 'path';
 import { defineConfig } from 'vite';
 
@@ -15,7 +14,7 @@ export default defineConfig(({ command }) => {
 
   return {
     plugins: [react()],
-    base: process.env.VITE_BASE || '/',
+    base: isDev? '/' : '/progress-dev/',
     server: {
       ...serverConfig,
       proxy: {
