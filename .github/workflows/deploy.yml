@@ -1,0 +1,64 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # ---------------------------
+      # Checkout
+      # ---------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ---------------------------
+      # Node setup
+      # ---------------------------
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # ---------------------------
+      # Install dependencies
+      # ---------------------------
+      - name: Install frontend deps
+        working-directory: ./frontend
+        run: npm ci
+
+      # ---------------------------
+      # Orval（API生成）
+      # ---------------------------
+      - name: Generate API client
+        working-directory: ./frontend
+        run: npm run generate:api
+        env:
+          VITE_OPENAPI_URL: https://api.anzai-home.com/progress-dev/openapi.json
+
+      # ---------------------------
+      # Build frontend
+      # ---------------------------
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+
+      # ---------------------------
+      # SSH Deploy
+      # ---------------------------
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+          script: |
+            cd ~/task-progress-docker
+            git pull origin main
+            docker compose down
+            docker compose up -d --build
