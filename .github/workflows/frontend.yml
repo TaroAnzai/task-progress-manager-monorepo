@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'frontend/**'
+
   workflow_dispatch:
 
 jobs:
@@ -13,33 +14,53 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # ---------------------------
+      # Checkout
+      # ---------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      # ---------------------------
+      # Node
+      # ---------------------------
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install deps
+      # ---------------------------
+      # Install
+      # ---------------------------
+      - name: Install dependencies
         working-directory: frontend
         run: npm ci
 
+      # ---------------------------
+      # Orval
+      # ---------------------------
       - name: Generate API
         working-directory: frontend
         run: npm run generate:api
         env:
-          VITE_OPENAPI_URL: https://api.anzai-home.com/progress-dev/openapi.json
+          VITE_OPENAPI_URL: https://api.anzai-home.com/progress/openapi.json
 
+      # ---------------------------
+      # Build
+      # ---------------------------
       - name: Build frontend
         working-directory: frontend
         run: npm run build
 
+      # ---------------------------
+      # Deploy
+      # ---------------------------
       - name: Deploy frontend
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
           script: |
             cd ~/task-progress-docker
             git pull origin main
