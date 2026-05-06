@@ -64,4 +64,4 @@ jobs:
           script: |
             cd ~/task-progress-docker
             git pull origin main
-            docker compose up -d --build frontend
+            docker compose -f docker-compose.prod.yml up -d --build frontend
