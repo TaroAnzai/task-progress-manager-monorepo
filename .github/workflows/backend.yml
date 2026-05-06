@@ -1,0 +1,27 @@
+name: Backend Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'docker-compose.prod.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy backend
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/task-progress-docker
+            git pull origin main
+            docker compose up -d --build backend celery_worker celery_beat

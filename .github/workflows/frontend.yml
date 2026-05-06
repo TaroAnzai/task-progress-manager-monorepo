@@ -1,0 +1,41 @@
+name: Frontend Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Generate API
+        working-directory: frontend
+        run: npm run generate:api
+        env:
+          VITE_OPENAPI_URL: https://api.anzai-home.com/progress-dev/openapi.json
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Deploy frontend
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/task-progress-docker
+            git pull origin main
+            docker compose up -d --build frontend
