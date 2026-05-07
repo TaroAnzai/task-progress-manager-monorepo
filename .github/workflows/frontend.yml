@@ -36,7 +36,7 @@ jobs:
         run: npm ci
 
       # ---------------------------
-      # Orval
+      # Generate API
       # ---------------------------
       - name: Generate API
         working-directory: frontend
@@ -52,16 +52,30 @@ jobs:
         run: npm run build
 
       # ---------------------------
-      # Deploy
+      # Upload dist
       # ---------------------------
-      - name: Deploy frontend
+      - name: Upload dist
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT }}
+
+          source: "frontend/dist/*"
+          target: "/home/taro/task-progress-docker/frontend/dist"
+
+      # ---------------------------
+      # Restart frontend container
+      # ---------------------------
+      - name: Restart frontend
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT }}
+
           script: |
             cd ~/task-progress-docker
-            git pull origin main
-            docker compose -f docker-compose.prod.yml up -d --build frontend
+            docker compose -f docker-compose.prod.yml restart frontend
