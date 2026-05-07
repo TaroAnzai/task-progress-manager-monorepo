@@ -63,7 +63,7 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
 
           source: "frontend/dist/*"
-          target: "/home/taro/task-progress-docker/frontend/dist"
+          target: "/home/taro/task-progress-docker/"
 
       # ---------------------------
       # Restart frontend container
