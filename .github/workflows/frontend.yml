@@ -43,7 +43,7 @@ jobs:
         run: npm run generate:api
         env:
           VITE_OPENAPI_URL: https://api.anzai-home.com/progress-dev/api/doc/openapi.json
-          VITE_API_BASE_URL: https://api.anzai-home.com//progress-dev/api/
+          VITE_API_BASE_URL: https://api.anzai-home.com/progress-dev/api
 
       # ---------------------------
       # Build
