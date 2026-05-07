@@ -8,6 +8,8 @@ services:
       - FLASK_ENV=production
     env_file:
       - ./backend/.env.prod
+    depends_on:
+      - db
     restart: always
 
   frontend:
@@ -18,15 +20,42 @@ services:
       - ./frontend/dist:/usr/share/nginx/html
     restart: always
 
+  db:
+    image: mysql:8.0
+    container_name: progress-db
+    restart: always
+    env_file:
+      - ./backend/.env.prod
+    ports:
+      - "3306:3306"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+
   celery_worker:
     build: ./backend
     command: celery -A app.celery_app.celery worker -Q progress_mail -n
       progress_mail@%h -c 2 -l info
     env_file:
       - ./backend/.env.prod
+    depends_on:
+      - db
+      - redis
 
   celery_beat:
     build: ./backend
     command: celery -A app.celery_app.celery beat --loglevel=info
     env_file:
       - ./backend/.env.prod
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  mysql_data:
