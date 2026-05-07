@@ -11,9 +11,11 @@ services:
     restart: always
 
   frontend:
-    build: ./frontend
+    image: nginx:alpine
     ports:
       - "8080:80"
+    volumes:
+      - ./frontend/dist:/usr/share/nginx/html
     restart: always
 
   celery_worker:
