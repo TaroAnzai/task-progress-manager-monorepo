@@ -9,6 +9,8 @@ services:
     env_file:
       - ./backend/.env.prod
     restart: always
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   frontend:
     image: nginx:alpine
