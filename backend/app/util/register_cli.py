@@ -8,8 +8,11 @@ from app.extensions import db
 from flask import Flask
 from werkzeug.security import generate_password_hash
 
+from app.util.migrate_task_access_command import migrate_task_access_command
+
 def register_cli(app:Flask):
     app.cli.add_command(create_superuser_command)
+    app.cli.add_command(migrate_task_access_command)
 
 
 @click.command("create-superuser")
