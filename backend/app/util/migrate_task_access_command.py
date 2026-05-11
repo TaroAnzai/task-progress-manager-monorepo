@@ -62,17 +62,17 @@ def register_task_access(
     for row in old_rows:
 
         if isinstance(row,TaskAccessUser):
-            key = (AccessSubjectType.USER, row.user_id)
+            subject_type  = AccessSubjectType.USER
             subject_id = row.user_id
         else:
-            key = (AccessSubjectType.ORGANIZATION, row.organization_id)
+            subject_type  = AccessSubjectType.ORGANIZATION
             subject_id = row.organization_id
-
+        key = (subject_type, subject_id)
         subject = existing_subjects.get(key)
 
         if subject is None:
             subject = AccessSubject()
-            subject.subject_type=AccessSubjectType.USER
+            subject.subject_type=subject_type
             subject.ref_id=subject_id
             
 
