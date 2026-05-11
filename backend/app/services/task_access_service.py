@@ -1,6 +1,6 @@
-from typing import Any
+from typing import Any, Iterable
 
-from sqlalchemy import select
+from sqlalchemy import select, delete, tuple_
 from sqlalchemy.orm import Session
 from app.models import AccessSubject, AccessSubjectType, GroupMember, Task, TaskAccess, User, Organization
 from app.utils import check_task_access, access_level_sufficient
@@ -97,13 +97,91 @@ def _remove_task_access(
 
     if task_access:
         db.delete(task_access)
+def _load_required_subjects(
+    db_session: Session,
+    accesses: Iterable[dict[str, Any]]
+) -> dict[tuple[Any, int], AccessSubject]:
+    """
+    必要なAccessSubjectのみを取得する。
 
-def update_access_level(db_session:Session, task_id:int, data:dict[str, Any], user:User):
+    Returns:
+        {
+            (subject_type, ref_id): AccessSubject
+        }
+    """
+
+    requested_keys = {
+        (
+            access["subject_type"],
+            access["ref_id"]
+        )
+        for access in accesses
+    }
+
+    if not requested_keys:
+        return {}
+
+    conditions = [
+        (subject_type, ref_id)
+        for subject_type, ref_id in requested_keys
+    ]
+
+    subjects = db_session.scalars(
+        select(AccessSubject).where(
+            tuple_(
+                AccessSubject.subject_type,
+                AccessSubject.ref_id
+            ).in_(conditions)
+        )
+    ).all()
+
+    return {
+        (subject.subject_type, subject.ref_id): subject
+        for subject in subjects
+    }
+def update_access_level(db_session:Session, task_id:int, data:dict[str,list[dict[str,Any]]], user:User):
     task = _get_task_by_id(db_session, task_id)
     if not task:
         raise ServiceNotFoundError('タスクが見つかりません')
     if not check_task_access(db_session,user, task.id, TaskAccessLevelEnum.FULL):
         raise ServicePermissionError('スコープ権限を変更する権限がありません')
+    db_session.execute(
+        delete(TaskAccess)
+        .where(TaskAccess.task_id == task_id)
+    )
+    existing_subjects = _load_required_subjects(db_session, data['accesses'])
+
+    for subject_data in data["accesses"]:
+        ref_id = subject_data["ref_id"]
+        subject_type = subject_data["subject_type"]
+        access_level = subject_data["access_level"]
+
+        subject = existing_subjects.get((subject_type, ref_id))
+
+        if not subject:
+            subject = AccessSubject()
+            subject.ref_id = ref_id
+            subject.subject_type=subject_type
+            db_session.add(subject)
+            db_session.flush()
+            existing_subjects[(subject_type, ref_id)] = subject
+        
+        task_access = TaskAccess()
+        task_access.task_id = task_id
+        task_access.subject_id = subject.id
+        task_access.access_level = access_level
+        db_session.add(task_access)
+
+    
+    db_session.commit()
+    return {'message': 'アクセス設定を更新しました'}
+
+
+
+
+
+
+
 
     # --- ユーザーアクセス処理 ---
     input_user_access = data.get('user_access', [])
