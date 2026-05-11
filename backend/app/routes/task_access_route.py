@@ -36,7 +36,7 @@ class AccessLevelResource(MethodView):
     @task_access_bp.arguments(AccessLevelInputSchema)
     @task_access_bp.response(200, MessageSchema)
     @with_common_error_responses(task_access_bp)
-    def put(self, data:dict[str,Any], task_id:int):
+    def put(self, data:dict[str,list[dict[str,Any]]], task_id:int):
         """アクセスレベル更新"""
         session = cast(Session, db.session)
         user = cast(User, current_user)
