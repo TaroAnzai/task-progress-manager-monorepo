@@ -9,16 +9,14 @@ from sqlalchemy.orm import Session
 from app.extensions import db
 from app.service_errors import ServiceError
 from app.decorators import with_common_error_responses
-from app.services import task_access_service
+from app.services.task_access_service import get_task_access, get_task_users, update_access_level
 from app.schemas import (
     UserWithScopesSchema,
-
 )
 from app.schemas import (
     AccessLevelInputSchema,
     MessageSchema,
-    AccessUserSchema,
-    OrgAccessSchema,
+    TaskAccessListResponseSchema
 )
 from app.models import User
 
@@ -40,7 +38,7 @@ class AccessLevelResource(MethodView):
         """アクセスレベル更新"""
         session = cast(Session, db.session)
         user = cast(User, current_user)
-        resp = task_access_service.update_access_level(session, task_id, data, user)
+        resp = update_access_level(session, task_id, data, user)
         return resp
 
 @task_access_bp.route('/authorized_users')
@@ -51,28 +49,18 @@ class TaskUsersResource(MethodView):
     def get(self, task_id:int):
         """タスクに登録されているユーザー取得"""
         session = cast(Session, db.session)
-        resp = task_access_service.get_task_users(session, task_id)
+        resp = get_task_users(session, task_id)
         return resp
 
-@task_access_bp.route('/access_users')
+@task_access_bp.route('/access_levels')
 class TaskAccessUsersResource(MethodView):
     @login_required
-    @task_access_bp.response(200, AccessUserSchema(many=True))
+    @task_access_bp.response(200, TaskAccessListResponseSchema)
     @with_common_error_responses(task_access_bp)
     def get(self, task_id:int):
-        """ユーザーアクセス一覧"""
+        """アクセスサブジェクト一覧"""
         session = cast(Session, db.session)
-        resp = task_access_service.get_task_access_users(session, task_id)
+        resp = get_task_access(session, task_id)
         return resp
 
-@task_access_bp.route('/access_organizations')
-class TaskAccessOrganizationsResource(MethodView):
-    @login_required
-    @task_access_bp.response(200, OrgAccessSchema(many=True))
-    @with_common_error_responses(task_access_bp)
-    def get(self, task_id:int):
-        """組織アクセス一覧"""
-        session = cast(Session, db.session)
-        resp = task_access_service.get_task_access_organizations(session, task_id)
-        return resp
 

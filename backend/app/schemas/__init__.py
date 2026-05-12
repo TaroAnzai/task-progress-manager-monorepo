@@ -61,9 +61,9 @@ from .progress_schemas import ProgressSchema, ProgressInputSchema
 from .access_scope_schemas import AccessScopeSchema, AccessScopeInputSchema
 from .task_access_schemas import (
     AuthorizedUserSchema,
-    AccessUserSchema,
-    OrgAccessSchema,
     AccessLevelInputSchema,
+    TaskAccessListResponseSchema,
+
 )
 from .ai_schemas import AISuggestInputSchema, JobIdSchema, AIResultSchema
 from .reminder_schemas import (

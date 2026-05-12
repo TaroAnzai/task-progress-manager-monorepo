@@ -30,14 +30,15 @@ def setup_task_access(system_admin_client, task_access_users, created_task_for_a
     task_id = created_task_for_access['id']
 
     user_access = [
-        {"user_id": task_access_users[level]["id"], "access_level": level.upper()}
+        {"ref_id": task_access_users[level]["id"], "access_level": level.upper(), "subject_type":"USER"}
         for level in ["view", "edit", "full", "owner"]
     ]
     org_access = [] # 必要に応じて組織アクセスも設定可能
 
+    payload = {'accesses': user_access}
     res = system_admin_client.put(
         f"/tasks/{task_id}/access_levels",
-        json={"user_access": user_access, "organization_access": org_access}
+        json=payload
     )
     assert res.status_code == 200
     return task_id
@@ -55,16 +56,17 @@ def setup_task_access_for_get_levels(system_admin_client, task_access_users):
     task_id = res.get_json()["task"]["id"]
 
     user_access = [
-        {"user_id": task_access_users[level]["id"], "access_level": level.upper()}
+        {"ref_id": task_access_users[level]["id"], "access_level": level.upper(), "subject_type":"USER"}
         for level in ["view", "edit", "full", "owner"]
     ]
     org_access = [
-        {"organization_id": task_access_users[level]["organization_id"], "access_level": level.upper()}
-        for level in ["view", "edit", "full", "owner"]
+        {"ref_id": task_access_users[level]["organization_id"], "access_level": level.upper(), "subject_type":"ORGANIZATION"}
+        for level in ["view"]
     ]
+    payload = {'accesses': user_access+org_access}
     res = system_admin_client.put(
         f"/tasks/{task_id}/access_levels",
-        json={"user_access": user_access, "organization_access": org_access}
+        json=payload
     )
     assert res.status_code == 200
     return task_id
@@ -80,8 +82,7 @@ class TestTaskAccessLevelUpdate:
         res = system_admin_client.put(
             f"/tasks/{task_id}/access_levels",
             json={
-                "user_access": [{"user_id": user["id"], "access_level": "FULL"}],
-                "organization_access": []
+                "accesses": [{"ref_id": user["id"], "access_level": "FULL", "subject_type":"USER"}],
             }
         )
         assert res.status_code == 200
@@ -90,7 +91,7 @@ class TestTaskAccessLevelUpdate:
     def test_update_access_level_not_found(self, system_admin_client):
         res = system_admin_client.put(
             "/tasks/9999/access_levels",
-            json={"user_access": [], "organization_access": []}
+            json={"accesses": []}
         )
         assert res.status_code == 404
 
@@ -100,7 +101,7 @@ class TestTaskAccessLevelUpdate:
         client = login_as_user(user["email"], "testpass")
         res = client.put(
             f"/tasks/{created_task_for_access['id']}/access_levels",
-            json={"user_access": [], "organization_access": []}
+            json={"accesses": []}
         )
         assert res.status_code == 403
 

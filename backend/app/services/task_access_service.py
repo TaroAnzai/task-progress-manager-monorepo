@@ -1,13 +1,14 @@
 from typing import Any, Iterable
 
-from sqlalchemy import select, delete, tuple_
+from sqlalchemy import  select, delete, tuple_, case
 from sqlalchemy.orm import Session
-from app.models import AccessSubject, AccessSubjectType, GroupMember, Task, TaskAccess, User, Organization
+from app.models import AccessSubject, AccessSubjectType, Group, GroupMember, Task, TaskAccess, User, Organization
 from app.utils import check_task_access, access_level_sufficient
 from app.constants import TaskAccessLevelEnum
 from app.service_errors import (
     ServicePermissionError,
     ServiceNotFoundError,
+    ServiceValidationError,
 )
 
 # Access levels in order of increasing permission
@@ -24,79 +25,6 @@ def _get_task_by_id(db_session:Session, task_id:int):
 def _get_task_by_id_with_deleted(db_session:Session, task_id:int):
     return db_session.get(Task, task_id)
 
-def _set_task_access_level(
-    db: Session,
-    task_id: int,
-    subject_type: AccessSubjectType,
-    ref_id: int,
-    access_level: TaskAccessLevelEnum,
-) -> None:
-    """
-    タスクのアクセスレベルを設定（更新 or 新規作成）
-    """
-
-    # =========================
-    # 1. AccessSubject取得 or 作成
-    # =========================
-    stmt = select(AccessSubject).where(
-        AccessSubject.subject_type == subject_type,
-        AccessSubject.ref_id == ref_id,
-    )
-    subject = db.scalar(stmt)
-
-    if subject is None:
-        subject = AccessSubject()
-        subject.subject_type = subject_type
-        subject.ref_id = ref_id
-        db.add(subject)
-        db.flush()  # id確定
-
-    # =========================
-    # 2. TaskAccess取得
-    # =========================
-    stmt = select(TaskAccess).where(
-        TaskAccess.task_id == task_id,
-        TaskAccess.subject_id == subject.id,
-    )
-    task_access = db.scalar(stmt)
-
-    # =========================
-    # 3. 更新 or 新規作成
-    # =========================
-    if task_access:
-        task_access.access_level = access_level
-    else:
-        task_access = TaskAccess()
-        task_access.task_id = task_id
-        task_access.subject_id = subject.id
-        task_access.access_level = access_level
-        db.add(task_access)
-
-    db.flush()
-
-def _remove_task_access(
-    db: Session,
-    task_id: int,
-    subject_type: AccessSubjectType,
-    ref_id: int,
-):
-    stmt = select(AccessSubject).where(
-        AccessSubject.subject_type == subject_type,
-        AccessSubject.ref_id == ref_id,
-    )
-    subject = db.scalar(stmt)
-
-    if not subject:
-        return
-
-    stmt = select(TaskAccess).where(
-        TaskAccess.task_id == task_id,
-        TaskAccess.subject_id == subject.id,
-    )
-    task_access = db.scalar(stmt)
-
-    if task_access:
-        db.delete(task_access)
 def _load_required_subjects(
     db_session: Session,
     accesses: Iterable[dict[str, Any]]
@@ -141,10 +69,21 @@ def _load_required_subjects(
     }
 def update_access_level(db_session:Session, task_id:int, data:dict[str,list[dict[str,Any]]], user:User):
     task = _get_task_by_id(db_session, task_id)
+    seen: set[tuple[AccessSubjectType, int]] = set()
     if not task:
         raise ServiceNotFoundError('タスクが見つかりません')
     if not check_task_access(db_session,user, task.id, TaskAccessLevelEnum.FULL):
         raise ServicePermissionError('スコープ権限を変更する権限がありません')
+    for access in data['accesses']:
+        key = (access["subject_type"], access['ref_id'])
+        if key in seen:
+            raise ServiceValidationError(
+                f"アクセス対象が重複しています: "
+                f"subject_type={access['subject_type'].name}, "
+                f"ref_id={access['ref_id']}"
+            )
+        seen.add(key)
+
     db_session.execute(
         delete(TaskAccess)
         .where(TaskAccess.task_id == task_id)
@@ -173,82 +112,6 @@ def update_access_level(db_session:Session, task_id:int, data:dict[str,list[dict
         db_session.add(task_access)
 
     
-    db_session.commit()
-    return {'message': 'アクセス設定を更新しました'}
-
-
-
-
-
-
-
-
-    # --- ユーザーアクセス処理 ---
-    input_user_access = data.get('user_access', [])
-    input_user_ids = {entry['user_id'] for entry in input_user_access}
-    stmt = (
-        select(User.id)
-        .select_from(TaskAccess)
-        .join(
-            AccessSubject,
-            (TaskAccess.subject_id == AccessSubject.id)
-            & (AccessSubject.subject_type == AccessSubjectType.USER)
-        )
-        .join(User, AccessSubject.ref_id == User.id)
-        .where(TaskAccess.task_id == task_id)
-    )
-    existing_user_ids = set(db_session.execute(stmt).scalars())
-
-    
-    for entry in input_user_access:
-        _set_task_access_level(
-            db_session,
-            task_id,
-            AccessSubjectType.USER,
-            entry['user_id'],
-            TaskAccessLevelEnum(entry['access_level'])
-        )
-
-    for user_id in existing_user_ids - input_user_ids:
-        _remove_task_access(
-            db_session,
-            task_id,
-            AccessSubjectType.USER,
-            user_id
-        )
-
-    # --- 組織アクセス処理（organization_idベース） ---
-    input_org_access = data.get('organization_access', [])
-    input_org_ids = {entry['organization_id'] for entry in input_org_access}
-    stmt = (
-        select(AccessSubject.ref_id)
-        .select_from(TaskAccess)
-        .join(
-            AccessSubject,
-            (TaskAccess.subject_id == AccessSubject.id)
-            & (AccessSubject.subject_type == AccessSubjectType.ORGANIZATION)
-        )
-        .where(TaskAccess.task_id == task_id)
-    )
-    existing_org_ids = set(db_session.execute(stmt).scalars())
-
-    for entry in input_org_access:
-        _set_task_access_level(
-            db_session,
-            task_id,
-            AccessSubjectType.ORGANIZATION,
-            entry['organization_id'],
-            TaskAccessLevelEnum(entry['access_level'])
-        )
-
-    for org_id in existing_org_ids - input_org_ids:
-        _remove_task_access(
-            db_session,
-            task_id,
-            AccessSubjectType.ORGANIZATION,
-            org_id
-        )
-
     db_session.commit()
     return {'message': 'アクセス設定を更新しました'}
 
@@ -330,7 +193,59 @@ def get_task_users(db: Session, task_id: int) -> list[User]:
             users.append(creator)
 
     return users
+def get_tasl_access(db_session:Session, task_id:int):
+    stmt = (
+        select(
+            TaskAccess.id.label("id"),
+            AccessSubject.id.label("subject_id"),
+            AccessSubject.subject_type.label("subject_type"),
+            AccessSubject.ref_id.label("ref_id"),
+            TaskAccess.access_level.label("access_level"),
+            case(
+                (
+                    AccessSubject.subject_type == AccessSubjectType.USER,
+                    User.name,
+                ),
+                (
+                    AccessSubject.subject_type == AccessSubjectType.ORGANIZATION,
+                    Organization.name,
+                ),
+                (
+                    AccessSubject.subject_type == AccessSubjectType.GROUP,
+                    Group.name,
+                ),
+                else_=None,
+            ).label("display_name"),
+        )
+        .select_from(TaskAccess)
+        .join(
+            AccessSubject,
+            AccessSubject.id == TaskAccess.subject_id,
+        )
+        .outerjoin(
+            User,
+            (User.id == AccessSubject.ref_id)
+            & (AccessSubject.subject_type == AccessSubjectType.USER),
+        )
+        .outerjoin(
+            Organization,
+            (Organization.id == AccessSubject.ref_id)
+            & (AccessSubject.subject_type == AccessSubjectType.ORGANIZATION),
+        )
+        .outerjoin(
+            Group,
+            (Group.id == AccessSubject.ref_id)
+            & (AccessSubject.subject_type == AccessSubjectType.GROUP),
+        )
+        .where(TaskAccess.task_id == task_id)
+    )
 
+    rows = db_session.execute(stmt).mappings().all()
+
+    return {
+        "accesses": [dict(row) for row in rows]
+    }
+    
 def get_task_access_users(db_session: Session, task_id: int):
     stmt = (
         select(User.id, User.name, TaskAccess.access_level)

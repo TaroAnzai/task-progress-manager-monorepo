@@ -16,39 +16,46 @@ class AccessEntrySchema(Schema):
     access_level = fields.Enum(TaskAccessLevelEnum,required=True,
         metadata={"description": "アクセスレベル", "example": "EDIT"}
     )
-class AccessUserSchema(Schema):
-    user_id = fields.Integer(dump_only=True, required=True, allow_none=False)
-    name = fields.Str(dump_only=True, required=True, allow_none=False)
-    access_level =  fields.Enum(TaskAccessLevelEnum, by_value=False, dump_only=True, required=True,
-                             metadata={"type": "string", "enum": [e.name for e in TaskAccessLevelEnum]}
-    )
 
-class OrgAccessSchema(Schema):
-    organization_id = fields.Integer(dump_only=True,required=True, allow_none=False)
-    name = fields.Str(dump_only=True,required=True, allow_none=False)
-    access_level =  fields.Enum(TaskAccessLevelEnum, by_value=False, dump_only=True, required=True,
-                             metadata={"type": "string", "enum": [e.name for e in TaskAccessLevelEnum]}
-    )
 
 class AccessLevelInputSchema(Schema):
     accesses = fields.List(fields.Nested(AccessEntrySchema), required=True,
                             metadata={"description": "アクセス設定一覧"}                       
     )
 
-class AccessLevelCreateSchema(Schema):
-    user_id = fields.Integer(load_only=True, allow_none=True)
-    organization_id = fields.Integer(load_only=True, allow_none=True)
-    group_id = fields.Integer(load_only=True, allow_none=True)
+class TaskAccessResponseSchema(Schema):
+    id = fields.Int(required=True, metadata={
+            "description": "TaskAccess ID", "example": 1,},
+    )
+    subject_id = fields.Int(required=True, metadata={
+            "description": "AccessSubject ID", "example": 10,},
+    )
+    subject_type = fields.Enum(AccessSubjectType, required=True, metadata={
+            "description": "アクセス対象種別", "example": "USER",},
+    )
+    ref_id = fields.Int(required=True, metadata={
+            "description": "対象ID。USERならuser_id、ORGANIZATIONならorganization_id、GROUPならgroup_id",
+            "example": 3,
+        },
+    )
+    access_level = fields.Enum(TaskAccessLevelEnum, required=True, metadata={
+            "description": "アクセスレベル", "example": "EDIT",},
+    )
+    display_name = fields.Str(allow_none=True, metadata={
+            "description": "画面表示用の名称。USERならユーザー名、ORGANIZATIONなら組織名、GROUPならグループ名",
+            "example": "営業チームA",
+        },
+    )
 
-    access_level = fields.Enum(TaskAccessLevelEnum, required=True)
+
+class TaskAccessListResponseSchema(Schema):
+    accesses = fields.List(
+        fields.Nested(TaskAccessResponseSchema),
+        required=True,
+        metadata={
+            "description": "タスクに設定されているアクセス一覧",
+        },
+    )
     
-class AccessLevelResponseSchema(Schema):
-    subject_id = fields.Integer()
-    subject_type = fields.Enum(AccessSubjectType)
-    subject_name = fields.String()
 
-    access_level = fields.Enum(TaskAccessLevelEnum)
 
-class AccessLevelUpdateSchema(Schema):
-    subject_id = fields.Integer(required=True)
-    access_level = fields.Enum(TaskAccessLevelEnum, required=True)
