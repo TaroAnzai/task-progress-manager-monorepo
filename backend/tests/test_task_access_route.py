@@ -170,9 +170,9 @@ class TestTaskAccessList:
 
     def test_get_task_access_users(self, system_admin_client, setup_task_access_for_get_levels):
 
-        res = system_admin_client.get(f"/tasks/{setup_task_access_for_get_levels}/access_users")
+        res = system_admin_client.get(f"/tasks/{setup_task_access_for_get_levels}/access_levels")
         assert res.status_code == 200
-        data = res.get_json()
+        data = res.get_json()['accesses']
         assert isinstance(data, list)
         assert len(data) > 0
 
@@ -185,9 +185,9 @@ class TestTaskAccessList:
                 assert False, f"Invalid access_level value: {item['access_level']}"
 
     def test_get_task_access_organizations(self, system_admin_client, setup_task_access_for_get_levels):
-        res = system_admin_client.get(f"/tasks/{setup_task_access_for_get_levels}/access_organizations")
+        res = system_admin_client.get(f"/tasks/{setup_task_access_for_get_levels}/access_levels")
         assert res.status_code == 200
-        data = res.get_json()
+        data = res.get_json()['accesses']
         assert isinstance(data, list)
         assert len(data) > 0
         for item in data:
@@ -202,7 +202,7 @@ def test_empty_accessuser(system_admin_client,test_task_data):
     res = client.post("/tasks", json=test_task_data)
     assert res.status_code == 201
     task = res.get_json()["task"]
-    res = client.get(f"/tasks/{task['id']}/access_users")
+    res = client.get(f"/tasks/{task['id']}/access_levels")
     assert res.status_code == 200
     users = res.get_json()
 

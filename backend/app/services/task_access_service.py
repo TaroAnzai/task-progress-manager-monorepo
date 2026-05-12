@@ -193,7 +193,7 @@ def get_task_users(db: Session, task_id: int) -> list[User]:
             users.append(creator)
 
     return users
-def get_tasl_access(db_session:Session, task_id:int):
+def get_task_access(db_session:Session, task_id:int):
     stmt = (
         select(
             TaskAccess.id.label("id"),
