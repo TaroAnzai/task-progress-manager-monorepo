@@ -14,7 +14,7 @@ import {
 import type { Task } from '@/api/generated/taskProgressAPI.schemas';
 
 import { ObjectiveListModal } from './objectiveListModal/ObjectiveListModal';
-import { TaskScopeModal } from './taskScopeModal/TaskScopeModal.tsx';
+import { TaskAccessModal } from './TaskAccessModal/TaskAccessModal';
 import { TaskSettingModal } from './taskSettingModal/TaskSettingModal';
 
 interface TaskSettingsIconProps {
@@ -28,25 +28,23 @@ export const TaskSettingsIcon = ({ task, isUpdateTask }: TaskSettingsIconProps) 
   const [openObjectiveModal, setOpenObjectiveModal] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
-  const handleOpenSetting = (e:Event) => {
+  const handleOpenSetting = (e: Event) => {
     e.preventDefault();
     setDropdownOpen(false);
     setTimeout(() => setOpenSetting(true), 0);
   };
 
-  const handleOpenScope = (e:Event) => {
+  const handleOpenScope = (e: Event) => {
     e.preventDefault();
     setDropdownOpen(false);
     setTimeout(() => setOpenScope(true), 0);
   };
 
-  const handleOpenObjectiveModal = (e:Event) => {
+  const handleOpenObjectiveModal = (e: Event) => {
     e.preventDefault();
     setDropdownOpen(false);
     setTimeout(() => setOpenObjectiveModal(true), 0);
   };
-
-
 
   return (
     <>
@@ -77,22 +75,24 @@ export const TaskSettingsIcon = ({ task, isUpdateTask }: TaskSettingsIconProps) 
 
       {/* 設定モーダル */}
 
-        <TaskSettingModal open={openSetting} task={task} onClose={() => setOpenSetting(false)} />
+      <TaskSettingModal open={openSetting} task={task} onClose={() => setOpenSetting(false)} />
 
       {/* スコープ設定モーダル */}
-
-        <TaskScopeModal open={openScope} task={task} onClose={() => setOpenScope(false)} />
-
+      <TaskAccessModal
+        open={openScope}
+        taskId={task.id}
+        taskTitle={task.title ?? ''}
+        onClose={() => setOpenScope(false)}
+      />
 
       {/* オブジェクティブ一覧モーダル */}
 
-        <ObjectiveListModal
-          open={openObjectiveModal}
-          task={task}
-          onClose={() => setOpenObjectiveModal(false)}
-          canUpdate={isUpdateTask}
-        />
-
+      <ObjectiveListModal
+        open={openObjectiveModal}
+        task={task}
+        onClose={() => setOpenObjectiveModal(false)}
+        canUpdate={isUpdateTask}
+      />
     </>
   );
 };
