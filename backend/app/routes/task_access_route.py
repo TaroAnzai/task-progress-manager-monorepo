@@ -1,6 +1,5 @@
 from typing import Any, cast
 
-from app.schemas.task_access_schemas import AccessSubjectSearchQuerySchema, AccessSubjectSearchResponseSchema
 from app.service_errors import format_error_response
 from flask import jsonify
 from flask_smorest import Blueprint
@@ -10,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.extensions import db
 from app.service_errors import ServiceError
 from app.decorators import with_common_error_responses
-from app.services.task_access_service import get_task_access, get_task_users, search_access_subjects, update_access_level
+from app.services.task_access_service import get_task_access, get_task_users, update_access_level
 from app.schemas import (
     UserWithScopesSchema,
 )
@@ -64,22 +63,5 @@ class TaskAccessUsersResource(MethodView):
         resp = get_task_access(session, task_id)
         return resp
 
-@task_access_bp.route('/access_levels')
-class AccessSubjectSearchResource(MethodView):
-    @login_required
-    @task_access_bp.arguments(AccessSubjectSearchQuerySchema, location="query")
-    @task_access_bp.response(200, AccessSubjectSearchResponseSchema)
-    @with_common_error_responses(task_access_bp)
-    def get(self, args: dict[str,Any]):
-        """ユーザー、組織、グループ検索"""
-        session = cast(Session, db.session)
-        subjects = search_access_subjects(
-            session,
-            keyword=args["keyword"],
-            subject_type=args.get("subject_type"),
-            limit=args.get("limit", 20),
-        )
-        return {
-            "subjects": subjects,
-        }
+
 

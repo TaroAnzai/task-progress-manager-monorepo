@@ -125,6 +125,7 @@ class AccessSubjectSearchItemSchema(Schema):
             "example": "yamada@example.com",
         },
     )
+    already_added = fields.Bool(required=True)
 
 
 class AccessSubjectSearchResponseSchema(Schema):

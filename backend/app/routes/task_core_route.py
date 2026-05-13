@@ -1,5 +1,6 @@
 from typing import Any, cast
 
+from app.schemas.task_access_schemas import AccessSubjectSearchQuerySchema, AccessSubjectSearchResponseSchema
 from app.service_errors import format_error_response
 from flask import jsonify
 from flask_smorest import Blueprint
@@ -22,6 +23,7 @@ from app.schemas import (
     DeleteQuerySchema
 )
 from app.models import User
+from app.services.task_access_service import search_access_subjects
 
 task_core_bp = Blueprint("Tasks", __name__, url_prefix="/tasks", description="タスク管理")
 
@@ -51,7 +53,7 @@ class TaskListResource(MethodView):
         session = cast(Session, db.session)
         user = cast(User, current_user)
         resp = task_core_service.get_tasks(session, user)
-        return {"tasks": resp} 
+        return {"tasks": resp}
 
 @task_core_bp.route("/<int:task_id>")
 class TaskResource(MethodView):
@@ -72,12 +74,12 @@ class TaskResource(MethodView):
     @with_common_error_responses(task_core_bp)
     def delete(self, args:dict[str, bool],task_id: int):
         """タスク削除 (論理・物理)"""
-        force = args["force"] 
+        force = args["force"]
         session = cast(Session, db.session)
         user = cast(User, current_user)
         task_core_service.delete_task(session, task_id, user, force)
         return {'message':'タスクを削除しました'}
-    
+
     @login_required
     @task_core_bp.response(200, TaskSchema)
     @with_common_error_responses(task_core_bp)
@@ -109,3 +111,22 @@ class StatusListResource(MethodView):
         result = task_core_service.get_statuses()
         print(result)
         return result
+
+@task_core_bp.route('/access_subjects/search')
+class AccessSubjectSearchResource(MethodView):
+    @login_required
+    @task_core_bp.arguments(AccessSubjectSearchQuerySchema, location="query")
+    @task_core_bp.response(200, AccessSubjectSearchResponseSchema)
+    @with_common_error_responses(task_core_bp)
+    def get(self, args: dict[str,Any]):
+        """ユーザー、組織、グループ検索"""
+        session = cast(Session, db.session)
+        subjects = search_access_subjects(
+            session,
+            keyword=args["keyword"],
+            subject_type=args.get("subject_type"),
+            limit=args.get("limit", 20),
+        )
+        return {
+            "subjects": subjects,
+        }
