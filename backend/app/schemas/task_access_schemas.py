@@ -1,11 +1,11 @@
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, validate
 from app.constants import TaskAccessLevelEnum
 from app.models import AccessSubjectType
 
 class AuthorizedUserSchema(Schema):
     user_id = fields.Integer(dump_only=True, required=True, allow_none=False)
     name = fields.Str(dump_only=True, required=True, allow_none=False)
-    
+
 class AccessEntrySchema(Schema):
     subject_type = fields.Enum(AccessSubjectType,required=True,
         metadata={"description": "アクセス対象種別", "example": "USER"}
@@ -20,7 +20,7 @@ class AccessEntrySchema(Schema):
 
 class AccessLevelInputSchema(Schema):
     accesses = fields.List(fields.Nested(AccessEntrySchema), required=True,
-                            metadata={"description": "アクセス設定一覧"}                       
+                            metadata={"description": "アクセス設定一覧"}
     )
 
 class TaskAccessResponseSchema(Schema):
@@ -56,6 +56,79 @@ class TaskAccessListResponseSchema(Schema):
             "description": "タスクに設定されているアクセス一覧",
         },
     )
-    
 
 
+# For serch scope
+
+class AccessSubjectSearchQuerySchema(Schema):
+    keyword = fields.String(
+        required=True,
+        validate=validate.Length(min=1, max=100),
+        metadata={
+            "description": "検索キーワード",
+            "example": "営業",
+        },
+    )
+
+    subject_type = fields.String(
+        required=False,
+        allow_none=True,
+        validate=validate.OneOf(["USER", "ORGANIZATION", "GROUP"]),
+        metadata={
+            "description": "検索対象種別。未指定の場合は全種別を検索する",
+            "example": "USER",
+        },
+    )
+
+    limit = fields.Integer(
+        required=False,
+        load_default=20,
+        validate=validate.Range(min=1, max=50),
+        metadata={
+            "description": "最大取得件数",
+            "example": 20,
+        },
+    )
+
+
+class AccessSubjectSearchItemSchema(Schema):
+    subject_type = fields.String(
+        required=True,
+        validate=validate.OneOf(["USER", "ORGANIZATION", "GROUP"]),
+        metadata={
+            "description": "アクセス対象種別",
+            "example": "USER",
+        },
+    )
+
+    ref_id = fields.Integer(
+        required=True,
+        metadata={
+            "description": "対象データのID。USERならUser.id、ORGANIZATIONならOrganization.id、GROUPならGroup.id",
+            "example": 1,
+        },
+    )
+
+    display_name = fields.String(
+        required=True,
+        metadata={
+            "description": "画面表示名",
+            "example": "山田太郎",
+        },
+    )
+
+    description = fields.String(
+        required=False,
+        allow_none=True,
+        metadata={
+            "description": "補足情報。メールアドレス、組織コード、グループ種別など",
+            "example": "yamada@example.com",
+        },
+    )
+
+
+class AccessSubjectSearchResponseSchema(Schema):
+    subjects = fields.List(
+        fields.Nested(AccessSubjectSearchItemSchema),
+        required=True,
+    )

@@ -1,6 +1,7 @@
-from typing import Any, Iterable
+from dataclasses import dataclass
+from typing import Any, Iterable, Literal
 
-from sqlalchemy import  select, delete, tuple_, case
+from sqlalchemy import  or_, select, delete, tuple_, case
 from sqlalchemy.orm import Session
 from app.models import AccessSubject, AccessSubjectType, Group, GroupMember, Task, TaskAccess, User, Organization
 from app.utils import check_task_access, access_level_sufficient
@@ -104,14 +105,14 @@ def update_access_level(db_session:Session, task_id:int, data:dict[str,list[dict
             db_session.add(subject)
             db_session.flush()
             existing_subjects[(subject_type, ref_id)] = subject
-        
+
         task_access = TaskAccess()
         task_access.task_id = task_id
         task_access.subject_id = subject.id
         task_access.access_level = access_level
         db_session.add(task_access)
 
-    
+
     db_session.commit()
     return {'message': 'アクセス設定を更新しました'}
 
@@ -245,7 +246,7 @@ def get_task_access(db_session:Session, task_id:int):
     return {
         "accesses": [dict(row) for row in rows]
     }
-    
+
 def get_task_access_users(db_session: Session, task_id: int):
     stmt = (
         select(User.id, User.name, TaskAccess.access_level)
@@ -293,3 +294,179 @@ def get_task_access_organizations(db_session: Session, task_id: int):
     } for id, name, access_level in entries]
 
     return result
+
+AccessSubjectTypeName = Literal["USER", "ORGANIZATION", "GROUP"]
+
+
+@dataclass(frozen=True)
+class AccessSubjectSearchResult:
+    subject_type: AccessSubjectTypeName
+    ref_id: int
+    display_name: str
+    description: str | None = None
+
+    def to_dict(self) -> dict[str,Any]:
+        return {
+            "subject_type": self.subject_type,
+            "ref_id": self.ref_id,
+            "display_name": self.display_name,
+            "description": self.description,
+        }
+
+
+def search_access_subjects(
+    db_session: Session,
+    *,
+    keyword: str,
+    subject_type: str | None = None,
+    limit: int = 20,
+) -> list[dict[str,Any]]:
+    """
+    タスク権限設定で追加可能な対象を横断検索する。
+
+    - USER: Userを検索
+    - ORGANIZATION: Organizationを検索
+    - GROUP: Groupを検索
+
+    subject_type が未指定の場合は全種別を検索する。
+    """
+
+    normalized_keyword = keyword.strip()
+
+    if not normalized_keyword:
+        return []
+
+    safe_limit = min(max(limit, 1), 50)
+
+    results: list[AccessSubjectSearchResult] = []
+
+    if subject_type is None or subject_type == "USER":
+        results.extend(
+            _search_users(
+                db_session,
+                keyword=normalized_keyword,
+                limit=safe_limit,
+            )
+        )
+
+    if subject_type is None or subject_type == "ORGANIZATION":
+        results.extend(
+            _search_organizations(
+                db_session,
+                keyword=normalized_keyword,
+                limit=safe_limit,
+            )
+        )
+
+    if subject_type is None or subject_type == "GROUP":
+        results.extend(
+            _search_groups(
+                db_session,
+                keyword=normalized_keyword,
+                limit=safe_limit,
+            )
+        )
+
+    return [item.to_dict() for item in results[:safe_limit]]
+
+
+def _search_users(
+    db_session: Session,
+    *,
+    keyword: str,
+    limit: int,
+) -> list[AccessSubjectSearchResult]:
+    like_keyword = f"%{keyword}%"
+
+    stmt = (
+        select(User)
+        .where(
+            or_(
+                User.name.ilike(like_keyword),
+                User.email.ilike(like_keyword),
+            )
+        )
+        .order_by(User.name.asc())
+        .limit(limit)
+    )
+
+    users = db_session.scalars(stmt).all()
+
+    return [
+        AccessSubjectSearchResult(
+            subject_type="USER",
+            ref_id=user.id,
+            display_name=user.name or user.email or f"User {user.id}",
+            description=user.email,
+        )
+        for user in users
+    ]
+
+
+def _search_organizations(
+    db_session: Session,
+    *,
+    keyword: str,
+    limit: int,
+) -> list[AccessSubjectSearchResult]:
+    like_keyword = f"%{keyword}%"
+
+    stmt = (
+        select(Organization)
+        .where(
+            or_(
+                Organization.name.ilike(like_keyword),
+                Organization.org_code.ilike(like_keyword),
+            )
+        )
+        .order_by(Organization.name.asc())
+        .limit(limit)
+    )
+
+    organizations = db_session.scalars(stmt).all()
+
+    return [
+        AccessSubjectSearchResult(
+            subject_type="ORGANIZATION",
+            ref_id=organization.id,
+            display_name=organization.name or organization.org_code,
+            description=(
+                f"organization_code: {organization.org_code}"
+                if organization.org_code
+                else None
+            ),
+        )
+        for organization in organizations
+    ]
+
+
+def _search_groups(
+    db_session: Session,
+    *,
+    keyword: str,
+    limit: int,
+) -> list[AccessSubjectSearchResult]:
+    like_keyword = f"%{keyword}%"
+
+    stmt = (
+        select(Group)
+        .where(Group.name.ilike(like_keyword))
+        .order_by(Group.name.asc())
+        .limit(limit)
+    )
+
+    groups = db_session.scalars(stmt).all()
+
+    return [
+        AccessSubjectSearchResult(
+            subject_type="GROUP",
+            ref_id=group.id,
+            display_name=group.name,
+            description=(
+                f"scope: {group.scope_type.name}"
+                if getattr(group, "scope_type", None) is not None
+                else None
+            ),
+        )
+        for group in groups
+    ]
