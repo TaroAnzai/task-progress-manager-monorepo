@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import {
+  getGetTasksTaskIdAccessLevelsQueryKey,
   useGetTasksAccessSubjectsSearch,
   useGetTasksTaskIdAccessLevels,
   usePutTasksTaskIdAccessLevels,
@@ -38,14 +40,11 @@ export const TaskAccessModal = ({
   onClose,
   onSaved,
 }: TaskAccessModalProps) => {
+  const qc = useQueryClient();
   const [items, setItems] = useState<TaskAccessItem[]>([]);
   const [keyword, setKeyword] = useState('');
 
-  /**
-   * ↓ 実際のOrvalフックに置き換えてください。
-   */
   const accessLevelsQuery = useGetTasksTaskIdAccessLevels(taskId);
-
   const searchQuery = useGetTasksAccessSubjectsSearch(
     { keyword: keyword },
     {
@@ -58,6 +57,8 @@ export const TaskAccessModal = ({
   const { mutate: updateMutation, isPending: isUpdating } = usePutTasksTaskIdAccessLevels({
     mutation: {
       onSuccess: () => {
+        const queryKey = getGetTasksTaskIdAccessLevelsQueryKey(taskId);
+        qc.invalidateQueries({ queryKey });
         toast.success('アクセス権限を更新しました');
         onSaved?.();
         onClose();

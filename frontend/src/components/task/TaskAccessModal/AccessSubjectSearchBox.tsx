@@ -43,6 +43,9 @@ export const AccessSubjectSearchBox = ({
   const handleChangeKeyword = (value: string) => {
     setKeyword(value);
     onSearchChange(value);
+    if (value.trim().length > 0) {
+      setIsFocused(true);
+    }
   };
 
   const handleFocus = () => {

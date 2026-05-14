@@ -428,7 +428,7 @@ def _search_organizations(
         )
     ]
     if company_id is not None:
-        conditions.append(User.company_id == company_id)
+        conditions.append(Organization.company_id == company_id)
     stmt = (
         select(Organization)
         .where(*conditions)
