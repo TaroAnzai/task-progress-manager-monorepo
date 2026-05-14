@@ -46,7 +46,14 @@ export const TaskAccessModal = ({
    */
   const accessLevelsQuery = useGetTasksTaskIdAccessLevels(taskId);
 
-  const searchQuery = useGetTasksAccessSubjectsSearch({ keyword: keyword });
+  const searchQuery = useGetTasksAccessSubjectsSearch(
+    { keyword: keyword },
+    {
+      query: {
+        enabled: !!keyword,
+      },
+    }
+  );
 
   const { mutate: updateMutation, isPending: isUpdating } = usePutTasksTaskIdAccessLevels({
     mutation: {

@@ -3,8 +3,8 @@ from typing import Any, Iterable, Literal
 
 from sqlalchemy import  or_, select, delete, tuple_, case
 from sqlalchemy.orm import Session
-from app.models import AccessSubject, AccessSubjectType, Group, GroupMember, Task, TaskAccess, User, Organization
-from app.utils import check_task_access, access_level_sufficient
+from app.models import AccessSubject, AccessSubjectType, Group, GroupMember, GroupScopeType, Task, TaskAccess, User, Organization
+from app.utils import check_task_access, access_level_sufficient, get_all_child_organizations
 from app.constants import TaskAccessLevelEnum
 from app.service_errors import (
     ServicePermissionError,
@@ -319,7 +319,8 @@ def search_access_subjects(
     *,
     keyword: str,
     subject_type: str | None = None,
-    limit: int = 20,
+    limit: int = 5,
+    user:User
 ) -> list[dict[str,Any]]:
     """
     タスク権限設定で追加可能な対象を横断検索する。
@@ -330,10 +331,11 @@ def search_access_subjects(
 
     subject_type が未指定の場合は全種別を検索する。
     """
-
     normalized_keyword = keyword.strip()
 
     if not normalized_keyword:
+        return []
+    if not user.is_superuser and user.company_id is None:
         return []
 
     safe_limit = min(max(limit, 1), 50)
@@ -346,6 +348,7 @@ def search_access_subjects(
                 db_session,
                 keyword=normalized_keyword,
                 limit=safe_limit,
+                company_id=user.company_id
             )
         )
 
@@ -355,6 +358,7 @@ def search_access_subjects(
                 db_session,
                 keyword=normalized_keyword,
                 limit=safe_limit,
+                company_id=user.company_id
             )
         )
 
@@ -364,6 +368,8 @@ def search_access_subjects(
                 db_session,
                 keyword=normalized_keyword,
                 limit=safe_limit,
+                user=user,
+                company_id=user.company_id
             )
         )
 
@@ -375,17 +381,21 @@ def _search_users(
     *,
     keyword: str,
     limit: int,
+    company_id: int|None,
 ) -> list[AccessSubjectSearchResult]:
     like_keyword = f"%{keyword}%"
+    conditions = [
+        or_(
+            User.name.ilike(like_keyword),
+            User.email.ilike(like_keyword),
+        )
+    ]
+    if company_id is not None:
+        conditions.append(User.company_id == company_id)
 
     stmt = (
         select(User)
-        .where(
-            or_(
-                User.name.ilike(like_keyword),
-                User.email.ilike(like_keyword),
-            )
-        )
+        .where(*conditions)
         .order_by(User.name.asc())
         .limit(limit)
     )
@@ -408,17 +418,20 @@ def _search_organizations(
     *,
     keyword: str,
     limit: int,
+    company_id: int|None,
 ) -> list[AccessSubjectSearchResult]:
     like_keyword = f"%{keyword}%"
-
+    conditions =[
+        or_(
+            Organization.name.ilike(like_keyword),
+            Organization.org_code.ilike(like_keyword),
+        )
+    ]
+    if company_id is not None:
+        conditions.append(User.company_id == company_id)
     stmt = (
         select(Organization)
-        .where(
-            or_(
-                Organization.name.ilike(like_keyword),
-                Organization.org_code.ilike(like_keyword),
-            )
-        )
+        .where(*conditions)
         .order_by(Organization.name.asc())
         .limit(limit)
     )
@@ -445,12 +458,38 @@ def _search_groups(
     *,
     keyword: str,
     limit: int,
+    user: User,
+    company_id: int|None,
 ) -> list[AccessSubjectSearchResult]:
     like_keyword = f"%{keyword}%"
+    if user.organization_id:
+        organization_ids = get_all_child_organizations(user.organization_id)
+    else:
+        organization_ids = []
+    current_user_id = user.id
 
+    conditions =[
+        User.company_id == company_id,
+        Group.name.ilike(like_keyword),
+        or_(
+            # PRIVATE: 自分が所有者のグループのみ
+            (
+                (Group.scope_type == GroupScopeType.PRIVATE)
+                & (Group.owner_user_id == current_user_id)
+            ),
+            # ORGANIZATION: 自分の所属組織または配下組織のグループ
+            (
+                (Group.scope_type == GroupScopeType.ORGANIZATION)
+                & (Group.organization_id.in_(organization_ids))
+            ),
+        ),
+    ]
+    if company_id is not None:
+        conditions.append(User.company_id == company_id)
     stmt = (
         select(Group)
-        .where(Group.name.ilike(like_keyword))
+        .join(User, User.id == Group.owner_user_id)
+        .where(*conditions)
         .order_by(Group.name.asc())
         .limit(limit)
     )

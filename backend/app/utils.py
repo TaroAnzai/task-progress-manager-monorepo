@@ -3,7 +3,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select, exists, and_, or_
 from .models import (
-    AccessSubject, 
+    AccessSubject,
     AccessSubjectType, GroupMember, TaskAccess, db, Organization, User, Task)
 from .constants import OrgRoleEnum, TaskAccessLevelEnum
 from .constants import (
@@ -11,24 +11,30 @@ from .constants import (
     OrgRoleEnum,
 )
 
-def get_all_child_organizations(org_id):
-    """
-    指定された org_id の下位すべての組織ID一覧を再帰的に取得するユーティリティ関数
-    """
-    org_ids = set()
-    queue = [org_id]
+def get_all_child_organizations(org_id: int) -> list[int]:
+    """org_id を起点に、その下位の組織をすべて返す"""
+    # 1回のDBアクセスで全取得
+    all_orgs = Organization.query.all()
 
-    while queue:
-        current = queue.pop()
-        org_ids.add(current)
-        children = Organization.query.filter(Organization.parent_id==current).all()
-        for child in children:
-            if child.id not in org_ids:
-                queue.append(child.id)
+    # 親IDをキーとしたマップ
+    org_map: dict[int, list[int]] = {}
+    for org in all_orgs:
+        org_map.setdefault(org.parent_id, []).append(org.id)
 
-    return list(org_ids)
+    # 訪問済みセットで循環参照も安全に処理
+    visited: set[int] = set()
+    stack = [org_id]
 
-def get_descendant_organizations(root_id, all_orgs):
+    while stack:
+        current = stack.pop()
+        if current in visited:
+            continue  # 循環参照ガード
+        visited.add(current)
+        stack.extend(org_map.get(current, []))
+
+    return list(visited)
+
+def get_descendant_organizations(root_id:int, all_orgs:list[Organization]):
     """
     root_id を起点に、その下位の組織（自身を含む）をすべて返す
     """
@@ -40,12 +46,12 @@ def get_descendant_organizations(root_id, all_orgs):
         descendants.append(root_org)
 
     # 親IDベースのマップを作成
-    org_map = {}
+    org_map:dict[int|None, list[Organization]] = {}
     for org in all_orgs:
         parent = org.parent_id
         org_map.setdefault(parent, []).append(org)
 
-    def recurse(parent_id):
+    def recurse(parent_id:int):
         for child in org_map.get(parent_id, []):
             descendants.append(child)
             recurse(child.id)

@@ -121,11 +121,13 @@ class AccessSubjectSearchResource(MethodView):
     def get(self, args: dict[str,Any]):
         """ユーザー、組織、グループ検索"""
         session = cast(Session, db.session)
+        user = cast(User, current_user)
         subjects = search_access_subjects(
             session,
             keyword=args["keyword"],
             subject_type=args.get("subject_type"),
             limit=args.get("limit", 20),
+            user=user
         )
         return {
             "subjects": subjects,
