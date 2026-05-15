@@ -117,16 +117,26 @@ class AccessSubjectSearchItemSchema(Schema):
         },
     )
 
-    description = fields.String(
-        required=False,
-        allow_none=True,
-        metadata={
-            "description": "補足情報。メールアドレス、組織コード、グループ種別など",
+    email = fields.Str(allow_none=True, metadata={
+            "description": "subject_type=USERの場合のメールアドレス",
             "example": "yamada@example.com",
         },
     )
-
-
+    organization_name = fields.Str(allow_none=True, metadata={
+            "description": "subject_type=USERの場合の組織名",
+            "example": "営業チームA",
+        },
+    )
+    organization_code = fields.Str(allow_none=True, metadata={
+            "description": "subject_type=ORGANIZATIONの場合の組織コード",
+            "example": "A",
+        },
+    )
+    group_scope_type = fields.Str(allow_none=True, metadata={
+            "description": "subject_type=GROUPの場合の公開範囲",
+            "example": "PRIVATE",
+        },
+    )
 
 class AccessSubjectSearchResponseSchema(Schema):
     subjects = fields.List(

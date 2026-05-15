@@ -2,6 +2,12 @@ import { useEffect, useState } from 'react';
 
 import { useLocation, useNavigate } from 'react-router-dom';
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 
 import { useGetCompaniesCompanyId } from '@/api/generated/taskProgressAPI';
@@ -9,6 +15,7 @@ import type { Company } from '@/api/generated/taskProgressAPI.schemas';
 
 import { CompanyRegisterDialog } from '@/components/admin/CompanyRegisterDialog';
 import { CompanySelectorDialog } from '@/components/admin/CompanySelectorDialog';
+import { AdminGroupComponent } from '@/components/admin/group/AdminGroupComponent';
 import { AdminOrganizationComponent } from '@/components/admin/organization/AdminOrganizationComponent';
 import { UserSettingComponent } from '@/components/admin/user/UserSettingComponent';
 import { AdminUserComponent } from '@/components/admin/users/AdminUserComponent';
@@ -56,50 +63,62 @@ const AdminPageContent = () => {
         👤 {user.name} (ID: {user.id}) organization:( {user.organization_name}) 権限:(
         {String(getUserRole())})
       </p>
-      <div className="flex justify-center space-y-6">
-        <UserSettingComponent className="" user={user} refetchUser={refetchUser} />
-      </div>
-
-      {hasAdminScope() ? (
-        <>
-          {user.is_superuser && (
-            <div className="space-y-6">
-              <div className="p-4 border rounded bg-white shadow">
-                <Button onClick={() => setDialogOpen(true)}>会社を選択</Button>
-                <Button onClick={() => setSelectedCompany(undefined)}>会社選択解除</Button>
-                <Button onClick={() => setRegisterOpen(true)}>会社を登録</Button>
-                {selectedCompany && <p>選択中: {selectedCompany.name}</p>}
-              </div>
-            </div>
-          )}
-
-          {selectedCompany ? (
-            <>
-              <div className="space-y-6">
-                <div className="p-4 border rounded bg-white shadow">
-                  <div className="mt-4 space-y-2">
-                    <AdminOrganizationComponent
-                      companyName={selectedCompany.name}
-                      companyId={selectedCompany.id}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-6">
-                <div className="p-4 border rounded bg-white shadow">
-                  <div className="mt-4 space-y-2">
-                    <AdminUserComponent companyId={selectedCompany.id!} />
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <p className="text-red-600 font-bold">⚠ 会社を選択してください。</p>
-          )}
-        </>
-      ) : (
-        <p className="text-red-600 font-bold">⚠ このページは管理者専用です。</p>
+      {user.is_superuser && (
+        <div className="space-y-6">
+          <div className="p-4 border rounded bg-white shadow">
+            <Button onClick={() => setDialogOpen(true)}>会社を選択</Button>
+            <Button onClick={() => setSelectedCompany(undefined)}>会社選択解除</Button>
+            <Button onClick={() => setRegisterOpen(true)}>会社を登録</Button>
+            {selectedCompany ? (
+              <p>選択中: {selectedCompany.name}</p>
+            ) : (
+              <p className="text-red-600 font-bold">⚠ 会社を選択してください。</p>
+            )}
+          </div>
+        </div>
       )}
+      <Accordion type="single" collapsible className="w-full rounded-lg border bg-white">
+        <AccordionItem value="user_password">
+          <AccordionTrigger className="ml-4">ユーザー名・パスワード変更</AccordionTrigger>
+          <AccordionContent>
+            <div className="flex justify-center space-y-6">
+              <UserSettingComponent className="" user={user} refetchUser={refetchUser} />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="company setting">
+          <AccordionTrigger className="ml-4 disabled:opacity-50">グループ設定</AccordionTrigger>
+          <AccordionContent>
+            <div className="mt-4 space-y-2">
+              <AdminGroupComponent />
+            </div>
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="organization setting" disabled={!hasAdminScope() || !selectedCompany}>
+          <AccordionTrigger className="ml-4 disabled:opacity-50">組織設定</AccordionTrigger>
+          <AccordionContent>
+            {selectedCompany ? (
+              <div className="mt-4 space-y-2">
+                <AdminOrganizationComponent
+                  companyName={selectedCompany.name}
+                  companyId={selectedCompany.id}
+                />
+              </div>
+            ) : null}
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="user setting" disabled={!hasAdminScope() || !selectedCompany}>
+          <AccordionTrigger className="ml-4 disabled:opacity-50">ユーザー設定</AccordionTrigger>
+          <AccordionContent>
+            {selectedCompany ? (
+              <div className="mt-4 space-y-2">
+                <AdminUserComponent companyId={selectedCompany.id!} />
+              </div>
+            ) : null}
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+
       {user.is_superuser && (
         <>
           <CompanySelectorDialog

@@ -303,14 +303,20 @@ class AccessSubjectSearchResult:
     subject_type: AccessSubjectTypeName
     ref_id: int
     display_name: str
-    description: str | None = None
 
-    def to_dict(self) -> dict[str,Any]:
+    email: str | None = None
+    organization_name: str | None = None
+    organization_code: str | None = None
+    group_scope_type: str | None = None
+    def to_dict(self) -> dict[str, Any]:
         return {
             "subject_type": self.subject_type,
             "ref_id": self.ref_id,
             "display_name": self.display_name,
-            "description": self.description,
+            "email": self.email,
+            "organization_name": self.organization_name,
+            "organization_code": self.organization_code,
+            "group_scope_type": self.group_scope_type,
         }
 
 
@@ -407,7 +413,8 @@ def _search_users(
             subject_type="USER",
             ref_id=user.id,
             display_name=user.name or user.email or f"User {user.id}",
-            description=user.email,
+            email=user.email,
+            organization_name=user.organization.name if user.organization else None,
         )
         for user in users
     ]
@@ -443,7 +450,7 @@ def _search_organizations(
             subject_type="ORGANIZATION",
             ref_id=organization.id,
             display_name=organization.name or organization.org_code,
-            description=(
+            organization_code=(
                 f"organization_code: {organization.org_code}"
                 if organization.org_code
                 else None
@@ -501,7 +508,7 @@ def _search_groups(
             subject_type="GROUP",
             ref_id=group.id,
             display_name=group.name,
-            description=(
+            group_scope_type=(
                 f"scope: {group.scope_type.name}"
                 if getattr(group, "scope_type", None) is not None
                 else None

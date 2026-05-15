@@ -201,7 +201,7 @@ class TestTaskAccessSubjectSearch:
 
         assert sales_user is not None
         assert sales_user["display_name"] == "営業 太郎"
-        assert sales_user["description"] == "sales.taro@example.com"
+        assert sales_user["email"] == "sales.taro@example.com"
 
         assert sales_org is not None
         assert sales_org["display_name"] == "営業部"
