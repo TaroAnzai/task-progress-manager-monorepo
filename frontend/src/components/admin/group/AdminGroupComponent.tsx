@@ -17,7 +17,11 @@ import {
   usePostGroups,
   usePutGroupsGroupIdMembers,
 } from '@/api/generated/taskProgressAPI';
-import type { GroupCreate, GroupUpdate } from '@/api/generated/taskProgressAPI.schemas';
+import type {
+  GroupCreate,
+  GroupMemberUser,
+  GroupUpdate,
+} from '@/api/generated/taskProgressAPI.schemas';
 
 import { useUser } from '@/context/useUser';
 
@@ -28,13 +32,22 @@ import {
   normalizeGroupFormValuesByPermission,
 } from './groupPermissionUtils';
 import { GroupSidebar } from './GroupSidebar';
-import type { GroupEditMode, GroupFormValues } from './types';
+import type { GroupEditMode, GroupFormValues, GroupMemberDisplayUser } from './types';
 
 const emptyFormValues = (): GroupFormValues => ({
   name: '',
   scope_type: 'PRIVATE',
   organization_id: null,
   member_user_ids: [],
+  member_users: [],
+});
+
+const toGroupMemberDisplayUser = (user: GroupMemberUser): GroupMemberDisplayUser => ({
+  ref_id: user.id,
+  display_name: user.name,
+  email: user.email,
+  organization_id: user.organization_id,
+  organization_name: user.organization_name,
 });
 
 export const AdminGroupComponent = () => {
@@ -115,6 +128,7 @@ export const AdminGroupComponent = () => {
     }
 
     const memberIds = groupMembersQuery.data?.user_ids ?? [];
+    const memberUsers = (groupMembersQuery.data?.users ?? []).map(toGroupMemberDisplayUser);
     const loadKey = `${selectedGroupId}:${memberIds.join(',')}`;
 
     if (lastLoadedKeyRef.current === loadKey) {
@@ -126,6 +140,7 @@ export const AdminGroupComponent = () => {
       scope_type: groupDetailQuery.data.scope_type,
       organization_id: groupDetailQuery.data.organization_id ?? null,
       member_user_ids: memberIds,
+      member_users: memberUsers,
     });
 
     lastLoadedKeyRef.current = loadKey;

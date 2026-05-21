@@ -146,8 +146,15 @@ export const GroupEditorPanel = ({
           <h3 className="mb-4 font-medium">メンバー</h3>
 
           <GroupMemberEditor
-            selectedUserIds={value.member_user_ids}
-            onChange={(nextUserIds) => setValue('member_user_ids', nextUserIds)}
+            initialUserIds={value.member_user_ids}
+            initialUsers={value.member_users}
+            onChange={(nextUserIds, nextUsers) =>
+              onChange({
+                ...value,
+                member_user_ids: nextUserIds,
+                member_users: nextUsers,
+              })
+            }
           />
         </div>
 

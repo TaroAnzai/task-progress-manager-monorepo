@@ -88,7 +88,7 @@ export const TaskAccessModal = ({
         subjectType: item.subject_type,
         refId: item.ref_id,
         name: item.display_name ?? item.display_name ?? '(名称未設定)',
-        description: item.description ?? '',
+        description: item.email ?? item.group_scope_type ?? item.organization_code ?? '???',
       })) ?? [],
     [searchQuery.data]
   );
