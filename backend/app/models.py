@@ -38,7 +38,7 @@ class IntEnumType(db.TypeDecorator):
     def __init__(self, enumtype:Type[E], *args:object, **kwargs:object) -> None:
         self._enumtype = enumtype
         super().__init__(*args, **kwargs)
-        
+
     def process_bind_param(self, value:IntEnum, dialect:Dialect) -> int|None:
         return value.value if isinstance(value, self._enumtype) else value
 
@@ -353,20 +353,20 @@ class TaskAccess(BaseModel):
 
     access_level: Mapped[TaskAccessLevelEnum] = mapped_column(IntEnumType(TaskAccessLevelEnum))
 class Group(BaseModel, SoftDeleteMixin):
-    __tablename__ = "group"
+    __tablename__ = "groups"
 
     name: Mapped[str]= mapped_column(String(255))
 
     owner_user_id: Mapped[int] = mapped_column(ForeignKey("user.id"))
-    members: Mapped[list["GroupMember"]] = relationship(back_populates="group")
+    members: Mapped[list["GroupMember"]] = relationship(back_populates="group", cascade="all, delete-orphan",)
     organization_id: Mapped[Optional[int]] = mapped_column(ForeignKey("organization.id"))
-    
+
 
     scope_type: Mapped[GroupScopeType] = mapped_column(IntEnumType(GroupScopeType))
 class GroupMember(BaseModel):
     __tablename__ = "group_member"
 
-    group_id: Mapped[int] = mapped_column(ForeignKey("group.id", ondelete="CASCADE"))
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"))
     user_id: Mapped[int] = mapped_column(ForeignKey("user.id", ondelete="CASCADE"))
 
     group: Mapped["Group"] = relationship(back_populates="members")
