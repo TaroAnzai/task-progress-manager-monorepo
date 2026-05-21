@@ -22,6 +22,22 @@ def test_list_group_member(system_admin_client:FlaskClient, group_payload:dict[s
     data = res.get_json()
     assert data["user_ids"] == group_payload["member_user_ids"], data
 
+    assert "users" in data
+    assert isinstance(data["users"], list)
+    assert len(data["users"]) >= 1
+
+    required_keys = {
+        "id",
+        "name",
+        "email",
+        "organization_id",
+        "organization_name",
+    }
+
+    first_user = data["users"][0]
+
+    assert required_keys.issubset(first_user.keys())
+
 def test_update_group_member(system_admin_client:FlaskClient, group_payload:dict[str, Any], root_org:dict[str, int|str]):
     res = system_admin_client.post("/groups", json=group_payload)
     assert res.status_code == 201, res.get_data(as_text=True)
@@ -49,6 +65,22 @@ def test_update_group_member(system_admin_client:FlaskClient, group_payload:dict
     assert res.status_code == 200, res.get_data(as_text=True)
     data = res.get_json()
     assert data['user_ids'] == user_ids
+
+    assert "users" in data
+    assert isinstance(data["users"], list)
+    assert len(data["users"]) >= 1
+
+    required_keys = {
+        "id",
+        "name",
+        "email",
+        "organization_id",
+        "organization_name",
+    }
+
+    first_user = data["users"][0]
+
+    assert required_keys.issubset(first_user.keys())
 
 
 

@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select, delete
 
-from app.models import GroupMember, Group, GroupScopeType, User
-from typing import List
+from app.models import GroupMember, Group, GroupScopeType, Organization, User
+from typing import Any, List
 
 from app.service_errors import ServicePermissionError, ServiceValidationError
 
@@ -23,6 +23,43 @@ def _can_view_group(user: User, group: Group) -> bool:
         )
 
     return False
+
+def _build_group_member_response(db_session: Session, group_id: int) -> dict[str, Any]:
+    """
+    グループメンバー一覧レスポンスを組み立てる
+    """
+    stmt = (
+        select(
+            User.id,
+            User.name,
+            User.email,
+            User.organization_id,
+            Organization.name.label("organization_name"),
+        )
+        .join(GroupMember, GroupMember.user_id == User.id)
+        .outerjoin(Organization, Organization.id == User.organization_id)
+        .where(GroupMember.group_id == group_id)
+        .order_by(User.name.asc())
+    )
+
+    rows = db_session.execute(stmt).all()
+
+    users = [
+        {
+            "id": row.id,
+            "name": row.name,
+            "email": row.email,
+            "organization_id": row.organization_id,
+            "organization_name": row.organization_name,
+        }
+        for row in rows
+    ]
+
+    return {
+        "group_id": group_id,
+        "user_ids": [user["id"] for user in users],
+        "users": users,
+    }
 def get_group_members(db_session: Session, group_id: int, current_user: User):
     """
     メンバー一覧取得（UI用にまとめて返す）
@@ -30,17 +67,11 @@ def get_group_members(db_session: Session, group_id: int, current_user: User):
     group = db_session.get(Group, group_id)
     if not group:
         raise ServiceValidationError("Group not found")
-    if _can_view_group(current_user, group) == False:
+
+    if not _can_view_group(current_user, group):
         raise ServicePermissionError("User does not have permission to view this group")
+    return _build_group_member_response(db_session, group_id)
 
-    user_ids = db_session.scalars(
-        select(GroupMember.user_id).where(GroupMember.group_id == group_id)
-    ).all()
-
-    return {
-        "group_id": group_id,
-        "user_ids": user_ids
-    }
 
 
 def replace_group_members(db_session: Session, group_id: int, user_ids: List[int], current_user: User):
@@ -102,7 +133,4 @@ def replace_group_members(db_session: Session, group_id: int, user_ids: List[int
 
     db_session.commit()
 
-    return {
-        "group_id": group_id,
-        "user_ids": list(new_set)
-    }
+    return _build_group_member_response(db_session, group_id)

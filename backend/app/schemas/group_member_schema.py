@@ -35,7 +35,50 @@ class GroupMemberReplaceSchema(Schema):
                 field_name="user_ids"
             )
 
+class GroupMemberUserSchema(Schema):
+    """
+    グループメンバー表示用ユーザー情報
+    """
 
+    id = fields.Int(
+        required=True,
+        metadata={
+            "description": "ユーザーID",
+            "example": 1,
+        },
+    )
+
+    name = fields.String(
+        required=True,
+        metadata={
+            "description": "ユーザー名",
+            "example": "山田 太郎",
+        },
+    )
+
+    email = fields.String(
+        allow_none=True,
+        metadata={
+            "description": "メールアドレス",
+            "example": "yamada@example.com",
+        },
+    )
+
+    organization_id = fields.Int(
+        allow_none=True,
+        metadata={
+            "description": "所属組織ID",
+            "example": 10,
+        },
+    )
+
+    organization_name = fields.String(
+        allow_none=True,
+        metadata={
+            "description": "所属組織名",
+            "example": "営業部",
+        },
+    )
 class GroupMemberListResponseSchema(Schema):
     """
     グループメンバー一覧レスポンス
@@ -55,5 +98,13 @@ class GroupMemberListResponseSchema(Schema):
         metadata={
             "description": "ユーザーID一覧",
             "example": [1, 2, 3]
+        }
+    )
+
+    users = fields.List(
+        fields.Nested(GroupMemberUserSchema),
+        required=True,
+        metadata={
+            "description": "グループメンバーの表示用ユーザー情報一覧",
         }
     )
