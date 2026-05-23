@@ -8,10 +8,19 @@ from config import Config
 from flask_smorest import Api # type: ignore
 
 from app.extensions import db, login_manager, migrate
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 def create_app(config_class: Union[Type[Config], str] = Config):
 
     app = Flask(__name__)
+
+    app.wsgi_app = ProxyFix(
+        app.wsgi_app,
+        x_for=1,
+        x_proto=1,
+        x_host=1,
+        x_prefix=1,
+    )
     app.config.from_object(config_class)
     URL_PREFIX = app.config.get("URL_PREFIX")
 
@@ -65,7 +74,7 @@ def create_app(config_class: Union[Type[Config], str] = Config):
     api.register_blueprint(task_order_bp, url_prefix=f"{URL_PREFIX}{task_order_bp.url_prefix}")
     api.register_blueprint(test_bp, url_prefix=f"{URL_PREFIX}{test_bp.url_prefix}")
     api.register_blueprint(user_bp, url_prefix=f"{URL_PREFIX}{user_bp.url_prefix}")
-    api.register_blueprint(reminder_bp, url_prefix=f"{URL_PREFIX}{reminder_bp.url_prefix}") 
+    api.register_blueprint(reminder_bp, url_prefix=f"{URL_PREFIX}{reminder_bp.url_prefix}")
     api.register_blueprint(password_reset_bp, url_prefix=f"{URL_PREFIX}{password_reset_bp.url_prefix}")
     api.register_blueprint(group_bp, url_prefix=f"{URL_PREFIX}{group_bp.url_prefix}")
     api.register_blueprint(group_member_bp, url_prefix=f"{URL_PREFIX}{group_member_bp.url_prefix}")
