@@ -71,7 +71,7 @@ def _build_reset_url(request_host_url: str, raw_token: str) -> str:
     React側のリセット画面（例）：/reset-password?token=...
     request_host_url は Flask の request.host_url を想定（末尾スラッシュ除去推奨）
     """
-    base = request_host_url.rstrip("/")
+    base = os.environ["FRONTEND_BASE_URL"].rstrip("/")
     return f"{base}/reset-password?token={raw_token}"
 
 

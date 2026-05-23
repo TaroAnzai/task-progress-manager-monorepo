@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
 import { Eye, EyeOff } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 
@@ -195,14 +195,14 @@ export default function LoginPage() {
         </form>
         <div className="flex flex-col items-end mt-4">
           <div className="flex flex-col">
-            <a href="/signup" className=" hover:underline ml-2">
+            <Link to="/signup" className=" hover:underline ml-2">
               新規登録
-            </a>
+            </Link>
           </div>
           <div>
-            <a href="/reset" className=" hover:underline ml-2">
+            <Link to="/reset" className=" hover:underline ml-2">
               パスワードを忘れた場合
-            </a>
+            </Link>
           </div>
         </div>
       </div>

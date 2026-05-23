@@ -11,15 +11,14 @@ export default defineConfig(({ command }) => {
     port: 5173,
   };
 
-
   return {
     plugins: [react()],
-    base: isDev? '/' : '/progress-dev/',
+    base: isDev ? '/' : '/progress/',
     server: {
       ...serverConfig,
       proxy: {
-        "/api": {
-          target: "http://localhost:5000",
+        '/api': {
+          target: 'http://localhost:5000',
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ''),
           secure: false,
