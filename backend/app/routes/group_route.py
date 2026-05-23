@@ -3,7 +3,7 @@ from typing import Any, cast
 from flask import jsonify
 from flask.views import MethodView
 from flask_smorest import Blueprint
-from flask_login import current_user
+from flask_login import current_user, login_required
 from sqlalchemy.orm import Session
 from app.extensions import db
 from app.schemas.group_schema import (
@@ -54,12 +54,14 @@ class GroupListResource(MethodView):
 @group_bp.route("/<int:group_id>")
 class GroupResource(MethodView):
 
+    @login_required
     @group_bp.response(200, GroupResponseSchema)
     def get(self, group_id:int):
         """グループ取得"""
         session = cast(Session, db.session)
         return get_group(session, group_id)
 
+    @login_required
     @group_bp.arguments(GroupUpdateSchema)
     @group_bp.response(200, GroupResponseSchema)
     def patch(self, data:dict[str, Any], group_id:int):
@@ -68,6 +70,7 @@ class GroupResource(MethodView):
         user = cast(User, current_user)
         return update_group(session, group_id, data, user)
 
+    @login_required
     @group_bp.response(204)
     def delete(self, group_id:int):
         """グループ削除"""

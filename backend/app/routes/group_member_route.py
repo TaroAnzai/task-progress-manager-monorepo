@@ -3,7 +3,7 @@ from flask import jsonify
 from sqlalchemy.orm import Session
 from flask.views import MethodView
 from flask_smorest import Blueprint
-from flask_login import current_user
+from flask_login import current_user, login_required
 from app.extensions import db
 from app.schemas.group_member_schema import (
     GroupMemberReplaceSchema,
@@ -32,6 +32,7 @@ def handle_service_error(e: ServiceError):
 @group_member_bp.route("")
 class GroupMemberResource(MethodView):
 
+    @login_required
     @group_member_bp.response(200, GroupMemberListResponseSchema)
     def get(self, group_id:int):
         """グループメンバー一覧取得"""
@@ -39,6 +40,7 @@ class GroupMemberResource(MethodView):
         user = cast(User, current_user)
         return get_group_members(session, group_id, user)
 
+    @login_required
     @group_member_bp.arguments(GroupMemberReplaceSchema)
     @group_member_bp.response(200, GroupMemberListResponseSchema)
     def put(self, data:dict[str,Any], group_id:int):
