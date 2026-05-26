@@ -42,11 +42,12 @@ const TaskPageContent = () => {
   const [selectedUser, setSelectedUser] = useState<PickedUser | null>(null);
   const [isObjExpand, setIsObjExpand] = useState<boolean | undefined>(undefined);
 
+  // 画面遷移時に保存した表示フィルターを復元
   useEffect(() => {
     const savedFilterLevels = loadFromLocalStorage();
     setFilterLevels(savedFilterLevels);
   }, []);
-
+  // ログインしていない場合はログイン画面に遷移
   useEffect(() => {
     if (userLoading) return;
     if (!user) {
