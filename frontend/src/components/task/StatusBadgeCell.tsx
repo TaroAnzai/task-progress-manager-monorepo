@@ -6,6 +6,8 @@ import type {
   TaskStatus,
   TaskUpdateStatus,
 } from '@/api/generated/taskProgressAPI.schemas';
+
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 type Props = {
   value: StatusType | TaskStatus;
   onChange?: (newStatus: updateStatusType | TaskUpdateStatus) => void;
@@ -51,29 +53,28 @@ export const StatusBadgeCell = ({ value, onChange, disabled = false }: Props) =>
   }, []);
 
   return (
-    <div className="relative inline-block" ref={ref}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={() => setOpen((prev) => !prev)}
-        className={`rounded-lg min-w-[80px] h-6 px-2 text-white ${STATUS_COLORS[currentStatus]}`}
-      >
-        {STATUS_LABELS[currentStatus]}
-      </button>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          disabled={disabled}
+          className={`rounded-lg min-w-[80px] h-6 px-2 text-white ${STATUS_COLORS[currentStatus]}`}
+        >
+          {STATUS_LABELS[currentStatus]}
+        </button>
+      </PopoverTrigger>
 
-      {open && (
-        <div className="absolute z-50 mt-1 w-40 bg-white border rounded shadow">
-          {Object.entries(STATUS_LABELS).map(([status, label]) => (
-            <button
-              key={status}
-              onClick={() => handleSelect(status as updateStatusType | TaskUpdateStatus)}
-              className="block w-full text-left px-3 py-1 hover:bg-gray-100"
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+      <PopoverContent align="start" side="bottom" sideOffset={4} className="w-40 p-0 z-[9999]">
+        {Object.entries(STATUS_LABELS).map(([status, label]) => (
+          <button
+            key={status}
+            onClick={() => handleSelect(status as updateStatusType | TaskUpdateStatus)}
+            className="block w-full text-left px-3 py-1.5 hover:bg-gray-100"
+          >
+            {label}
+          </button>
+        ))}
+      </PopoverContent>
+    </Popover>
   );
 };

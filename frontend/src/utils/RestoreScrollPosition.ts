@@ -31,7 +31,6 @@ export const useRestoreScrollPosition = (
       if (top === 0) return;
 
       sessionStorage.setItem(key, String(top));
-      console.log('Save scroll position', top);
     };
 
     target.addEventListener('scroll', saveScroll);
@@ -40,6 +39,7 @@ export const useRestoreScrollPosition = (
       target.removeEventListener('scroll', saveScroll);
     };
   }, [key, scrollRef, restoreReady]);
+
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return;
@@ -50,7 +50,6 @@ export const useRestoreScrollPosition = (
       const top = Number(savedY);
       if (top <= 0) return;
 
-      console.log('Restore scroll position on visible', top);
       setScrollTop(top);
     };
 
@@ -60,10 +59,10 @@ export const useRestoreScrollPosition = (
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [key, scrollRef]);
+
   useEffect(() => {
     const handleBeforeUnload = () => {
       sessionStorage.setItem(key, '0');
-      console.log('Save scroll position on reload', 0);
     };
 
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -72,6 +71,7 @@ export const useRestoreScrollPosition = (
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [key]);
+
   useEffect(() => {
     if (!restoreReady) return;
     if (restoredRef.current) return;
@@ -81,8 +81,6 @@ export const useRestoreScrollPosition = (
 
     const top = Number(savedY);
     if (top <= 0) return;
-
-    console.log('Restore scroll position', top);
 
     restoringRef.current = true;
 
