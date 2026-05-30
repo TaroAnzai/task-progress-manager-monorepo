@@ -1,5 +1,16 @@
 import { AccessEntryAccessLevel, UserInputRole } from '@/api/generated/taskProgressAPI.schemas.ts';
-
+export const getRoleLabelJa = (role?: string | null): string => {
+  switch (role) {
+    case 'Superuser':
+      return 'スーパーユーザー';
+    case 'system-admin':
+      return 'システム管理者';
+    case 'organization-admin':
+      return '組織管理者';
+    default:
+      return 'メンバー';
+  }
+};
 export const ROLE_LABELS: Record<UserInputRole, string> = {
   [UserInputRole.SYSTEM_ADMIN]: 'システム管理者',
   [UserInputRole.ORG_ADMIN]: '組織管理者',

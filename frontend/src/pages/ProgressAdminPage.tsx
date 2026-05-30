@@ -20,6 +20,7 @@ import { AdminOrganizationComponent } from '@/components/admin/organization/Admi
 import { UserSettingComponent } from '@/components/admin/user/UserSettingComponent';
 import { AdminUserComponent } from '@/components/admin/users/AdminUserComponent';
 
+import { getRoleLabelJa } from '@/context/roleLabels';
 import { useUser } from '@/context/useUser';
 
 const AdminPageContent = () => {
@@ -58,10 +59,10 @@ const AdminPageContent = () => {
     return null;
   }
   return (
-    <div className="p-4">
-      <p className="font-bold text-lg mb-4">
-        👤 {user.name} (ID: {user.id}) organization:( {user.organization_name}) 権限:(
-        {String(getUserRole())})
+    <div className="px-4 py-1">
+      <p className="font-bold text-lg mb-1">
+        👤 {user.name} (ID: {user.id}) 所属組織:( {user.organization_name}) 権限:(
+        {getRoleLabelJa(getUserRole())} )
       </p>
       {user.is_superuser && (
         <div className="space-y-6">

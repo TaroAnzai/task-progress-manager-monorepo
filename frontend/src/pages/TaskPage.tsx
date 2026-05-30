@@ -9,6 +9,7 @@ import { TaskControlPanel } from '@/components/task/TaskControlPanel';
 import { TaskList } from '@/components/task/TaskList';
 import type { PickedUser } from '@/components/task/ViewUserSelectModal/ViewUserSelectModal';
 
+import { getRoleLabelJa } from '@/context/roleLabels';
 import { useUser } from '@/context/useUser';
 
 const STORAGE_KEY = 'task_view_mode';
@@ -81,9 +82,9 @@ const TaskPageContent = () => {
   if (!user) return null;
   return (
     <>
-      <p className="font-bold text-lg mb-4">
-        👤 {user.name} (ID: {user.id}) organization:( {user.organization_name}) 権限:(
-        {String(getUserRole())})
+      <p className="font-bold text-lg mb-1">
+        👤 {user.name} (ID: {user.id}) 所属組織:( {user.organization_name}) 権限:(
+        {getRoleLabelJa(getUserRole())} )
       </p>
       <TaskControlPanel
         onAllExpand={onAllExpand}
