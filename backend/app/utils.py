@@ -178,11 +178,25 @@ def check_org_access(user: User, organization_id: int, required_role: OrgRoleEnu
     return highest_role >= required_role
 
 
-def require_superuser(user):
+def require_superuser(user: User) -> bool:
     if not getattr(user, 'is_superuser', False):
         return False
     return True
 
 
+def get_ancestor_organization_ids(org_id: int) -> list[int]:
+    """
+    org_id を起点に、自身と上位組織のIDを返す
+    """
+    all_orgs = Organization.query.all()
+    org_by_id = {org.id: org for org in all_orgs}
 
+    ids = []
+    current = org_by_id.get(org_id)
+
+    while current:
+        ids.append(current.id)
+        current = org_by_id.get(current.parent_id)
+
+    return ids
 
