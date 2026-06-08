@@ -6,14 +6,19 @@ from typing import Any
 
 from app.constants import OrgRoleEnum
 from app.service_errors import ServicePermissionError, ServiceValidationError
-from app.utils import check_org_access
+from app.utils import check_org_access, get_ancestor_organization_ids
 
 
 def list_groups(db_session: Session, current_user: User):
 
     if current_user.is_superuser:
         return db_session.scalars(select(Group)).all()
+    target_org_ids: list[int] = []
 
+    if current_user.organization_id:
+        target_org_ids = get_ancestor_organization_ids(
+            current_user.organization_id
+        )
     stmt = select(Group).where(
         or_(
             # PRIVATE → ownerのみ
@@ -25,7 +30,7 @@ def list_groups(db_session: Session, current_user: User):
             # ORGANIZATION → 同一organization
             and_(
                 Group.scope_type == GroupScopeType.ORGANIZATION,
-                Group.organization_id == current_user.organization_id
+                Group.organization_id.in_(target_org_ids)
             ),
 
             # GLOBAL → 全員
@@ -58,7 +63,7 @@ def create_group(db_session: Session, data: dict[str, Any], current_user: User):
         if check_org_access(current_user, org_id, OrgRoleEnum.ORG_ADMIN) is False:
             raise ServicePermissionError("User does not have access to the specified organization")
 
-    
+
 
     # -------------------------
     # Group作成
@@ -126,10 +131,10 @@ def delete_group(db_session: Session, group_id: int, current_user: User):
 
     if current_user.is_superuser is False and group.owner_user_id != current_user.id:
         raise ServicePermissionError("Only superusers or the group owner can delete the group")
-    
+
     db_session.query(GroupMember)\
         .filter(GroupMember.group_id == group_id)\
         .delete(synchronize_session=False)
-    
+
     db_session.delete(group)
     db_session.commit()
