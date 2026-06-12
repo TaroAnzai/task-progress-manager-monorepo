@@ -1,5 +1,8 @@
+from typing import cast
+
 from flask_migrate import current
 
+from app.models import User
 from app.service_errors import format_error_response
 from flask import jsonify
 from flask_smorest import Blueprint
@@ -48,7 +51,7 @@ class UsersResource(MethodView):
         return result
 
 @user_bp.route("/admin")
-class UserResource(MethodView):    
+class UserResource(MethodView):
     @login_required
     @user_bp.arguments(UserQuerySchema, location="query")
     @user_bp.response(200, UserSchemaForAdmin(many=True))
@@ -64,9 +67,10 @@ class UserResource(MethodView):
     @login_required
     @user_bp.response(200, UserWithScopesSchema)
     @with_common_error_responses(user_bp)
-    def get(self, user_id):
+    def get(self, user_id:int):
         """ユーザー取得"""
-        result = user_service.get_user_by_id(user_id, current_user)
+        user = cast(User, current_user)
+        result = user_service.get_user_by_id(user_id, user)
         return result
 
     @login_required
@@ -84,7 +88,7 @@ class UserResource(MethodView):
     @with_common_error_responses(user_bp)
     def delete(self, args, user_id):
         """ユーザー削除"""
-        force = args["force"] 
+        force = args["force"]
         result = user_service.delete_user(user_id, current_user, force)
         return result
 

@@ -1,7 +1,7 @@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 import {
-  useGetGroupsGroupId,
+  useGetGroupsGroupIdMembers,
   useGetOrganizationsOrgId,
   useGetUsersUserId,
 } from '@/api/generated/taskProgressAPI';
@@ -16,18 +16,15 @@ type Props = {
 };
 
 export const SubjectDeteailPopover = ({ item, getSubjectIcon, getSubjectTypeLabel }: Props) => {
-  console.log(item);
-  const user = useGetUsersUserId(item.refId, {
+  const { data: user } = useGetUsersUserId(item.refId, {
     query: { enabled: item.subjectType === AccessEntrySubjectType.USER },
   });
-  const organization = useGetOrganizationsOrgId(item.refId, {
+  const { data: organization } = useGetOrganizationsOrgId(item.refId, {
     query: { enabled: item.subjectType === AccessEntrySubjectType.ORGANIZATION },
   });
-  const group = useGetGroupsGroupId(item.refId, {
+  const { data: group } = useGetGroupsGroupIdMembers(item.refId, {
     query: { enabled: item.subjectType === AccessEntrySubjectType.GROUP },
   });
-
-  console.log(user, organization, group);
 
   return (
     <Popover>
@@ -62,6 +59,22 @@ export const SubjectDeteailPopover = ({ item, getSubjectIcon, getSubjectTypeLabe
         <div className="mt-1 text-xs text-slate-500">{getSubjectTypeLabel(item.subjectType)}</div>
 
         {item.description && <p className="mt-2 text-sm text-slate-600">{item.description}</p>}
+        {item.subjectType === AccessEntrySubjectType.USER && user && (
+          <>
+            <p className="mt-2 text-sm text-slate-600">{user.organization_name}</p>
+            <p className="mt-2 text-sm text-slate-600">{user.email}</p>
+          </>
+        )}
+        {item.subjectType === AccessEntrySubjectType.ORGANIZATION && organization && (
+          <p className="mt-2 text-sm text-slate-600"></p>
+        )}
+        {item.subjectType === AccessEntrySubjectType.GROUP &&
+          group &&
+          group.users.map((user) => (
+            <p key={user.id} className="mt-2 text-sm text-slate-600">
+              {user.name}
+            </p>
+          ))}
       </PopoverContent>
     </Popover>
   );

@@ -1,6 +1,6 @@
 import { config } from 'dotenv';
 
-config({ path: '.env.production' });
+config({ path: '.env.development' });
 
 export default {
   progressApi: {

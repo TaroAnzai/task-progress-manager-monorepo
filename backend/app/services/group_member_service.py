@@ -5,8 +5,9 @@ from app.models import GroupMember, Group, GroupScopeType, Organization, User
 from typing import Any, List
 
 from app.service_errors import ServicePermissionError, ServiceValidationError
+from app.utils import get_ancestor_organization_ids, get_descendant_organizations
 
-def _can_view_group(user: User, group: Group) -> bool:
+def _can_view_group(user: User, group: Group, company_id: int) -> bool:
     if user.is_superuser:
         return True
 
@@ -14,13 +15,21 @@ def _can_view_group(user: User, group: Group) -> bool:
         return True
 
     if group.scope_type == GroupScopeType.GLOBAL:
-        return True
+        if user.organization is None:
+            return False
+        if user.organization.company_id == company_id:
+            return True
 
     if group.scope_type == GroupScopeType.ORGANIZATION:
-        return (
-            user.organization_id is not None
-            and group.organization_id == user.organization_id
-        )
+        if user.organization_id is None:
+            return False
+        allowed_org_ids = set(get_ancestor_organization_ids(user.organization_id))
+        all_orgs = Organization.query.filter(Organization.is_deleted != True).all()
+        descendants = get_descendant_organizations(user.organization_id, all_orgs)
+        descendants_ids = [org.id for org in descendants]
+        allowed_org_ids.update(descendants_ids)
+        return group.organization_id in allowed_org_ids
+
 
     return False
 
@@ -64,12 +73,25 @@ def get_group_members(db_session: Session, group_id: int, current_user: User):
     """
     メンバー一覧取得（UI用にまとめて返す）
     """
-    group = db_session.get(Group, group_id)
-    if not group:
+    stmt = (
+        select(Group, Organization.company_id)
+        .outerjoin(
+            Organization,
+            Group.organization_id == Organization.id,
+        )
+        .where(Group.id == group_id)
+    )
+
+    row = db_session.execute(stmt).one_or_none()
+    if row is None:
         raise ServiceValidationError("Group not found")
 
-    if not _can_view_group(current_user, group):
+    group, company_id = row
+
+    if not _can_view_group(current_user, group, company_id):
         raise ServicePermissionError("User does not have permission to view this group")
+
+
     return _build_group_member_response(db_session, group_id)
 
 

@@ -1,10 +1,12 @@
 # services/user_service.py
 
+from typing import Any
+
 from flask import current_app
 import re
 from sqlalchemy import exists, select
 from sqlalchemy.orm import joinedload
-from ..models import Objective, ObjectiveReminderLog, ProgressUpdate, Task, db, User, Organization, AccessScope, Company
+from ..models import Objective, ObjectiveReminderLog, ProgressUpdate, Task, db, User, Organization, AccessScope
 from ..utils import (
     get_all_child_organizations,
     get_descendant_organizations,
@@ -16,7 +18,6 @@ from ..service_errors import (
     ServicePermissionError,
     ServiceNotFoundError,
 )
-import re
 from app.constants import OrgRoleEnum  # enum 定義を利用
 from sqlalchemy.exc import IntegrityError
 
@@ -26,11 +27,11 @@ def _is_email_taken(norm_email: str, exclude_user_id: int | None = None) -> bool
         q = q.filter(User.id != exclude_user_id)
     return db.session.query(q.exists()).scalar()
 
-def is_valid_email(email):
+def is_valid_email(email: str):
     # シンプルな正規表現（RFC全準拠ではなく一般的な形式の検出）
     return re.match(r"^[\w\.-]+@[\w\.-]+\.\w+$", email)
 
-def create_user(data, current_user: User):
+def create_user(data:dict[str, Any], current_user: User):
     if not current_user:
         raise ServiceNotFoundError('ログインユーザーが見つかりません')
     #組織の項目のチェック
@@ -49,7 +50,7 @@ def create_user(data, current_user: User):
 
     # 必須項目チェック
     if not is_valid_email(email):
-        raise ServiceValidationError('無効なメールアドレス形式です') 
+        raise ServiceValidationError('無効なメールアドレス形式です')
     norm = email.strip().lower()
 
     if _is_email_taken(norm):
@@ -61,7 +62,7 @@ def create_user(data, current_user: User):
 
     if wp_user_id and User.query.filter_by(wp_user_id=wp_user_id).first():
         raise ServiceValidationError('この wp_user_id は既に使用されています')
-    
+
     org = db.session.get(Organization, org_id)
     if not org:
         raise ServiceValidationError('指定された組織IDが存在しません')
@@ -93,48 +94,69 @@ def create_user(data, current_user: User):
 
 
 
-def get_user_by_id(user_id, current_user):
+def get_user_by_id(user_id: int, current_user: User):
     user = db.session.get(User, user_id)
     if not user:
         raise ServiceNotFoundError('ユーザーが見つかりません')
-
-    if not check_org_access(current_user, user.organization_id, OrgRoleEnum.ORG_ADMIN):
+    if current_user.company_id != user.company_id:
         raise ServicePermissionError('権限がありません')
 
     return user
 
-def update_user(user_id, data, current_user):
+def update_user(user_id: int, data: dict[str, Any], current_user: User) -> User:
     user = db.session.get(User, user_id)
     if not user:
         raise ServiceNotFoundError('ユーザーが見つかりません')
 
+    # 更新対象ユーザーの現在の所属組織に対する権限
+    if user.organization_id == None:
+        raise ServicePermissionError('権限がありません')
     if not check_org_access(current_user, user.organization_id, OrgRoleEnum.ORG_ADMIN):
         raise ServicePermissionError('権限がありません')
+
+    if 'organization_id' in data:
+        new_org_id = data['organization_id']
+
+        new_org = db.session.get(Organization, new_org_id)
+        if not new_org:
+            raise ServiceValidationError('指定された組織IDが存在しません')
+
+        # 移動先組織に対する権限も確認
+        if not check_org_access(current_user, new_org_id, OrgRoleEnum.ORG_ADMIN):
+            raise ServicePermissionError('移動先組織への権限がありません')
+
+        user.organization_id = new_org_id
 
     if 'name' in data:
         user.name = data['name']
 
     if 'wp_user_id' in data:
-        if User.query.filter(User.wp_user_id == data['wp_user_id'], User.id != user_id).first():
-            raise ServiceValidationError('この wp_user_id は既に使用されています')
-        user.wp_user_id = data['wp_user_id']
+        wp_user_id = data['wp_user_id']
 
-    if 'organization_id' in data:
-    # organization_id の変更後の値を取得しておく
-        new_org_id = data.get('organization_id', user.organization_id)
-        new_org = db.session.get(Organization, new_org_id)
-        if not new_org:
-            raise ServiceValidationError('指定された組織IDが存在しません')
-        user.organization_id = new_org_id
+        if User.query.filter(
+            User.wp_user_id == wp_user_id,
+            User.id != user_id
+        ).first():
+            raise ServiceValidationError('この wp_user_id は既に使用されています')
+
+        user.wp_user_id = wp_user_id
 
     if 'email' in data:
-        if not is_valid_email(data['email']):
-            raise ServiceValidationError('無効なメールアドレス形式です') 
-        norm = data['email'].strip().lower()
-        if _is_email_taken(norm):
+        email = data['email'].strip()
+
+        if not is_valid_email(email):
+            raise ServiceValidationError('無効なメールアドレス形式です')
+
+        norm = email.lower()
+
+        if User.query.filter(
+            User.normalized_email == norm,
+            User.id != user_id
+        ).first():
             raise ServiceValidationError("このメールアドレスは既に使用されています。")
 
-        user.email = data['email']
+        user.email = email
+        user.normalized_email = norm
 
     if 'password' in data and data['password']:
         user.set_password(data['password'])
@@ -238,7 +260,7 @@ def get_users_by_org_tree(org_id, current_user):
         return users
     except Exception as e:
         raise ServiceValidationError(str(e))
-     
+
 def get_user_for_admin(user, query_args):
     requesting_user_id = user.id
     company_id = query_args.get('company_id')
