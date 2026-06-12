@@ -2,16 +2,26 @@
 
 import React, { useEffect, useState } from 'react';
 
-import { toast } from "sonner";
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-import { usePostAccessScopesUsersUserId, usePostUsers, usePutUsersUserId } from '@/api/generated/taskProgressAPI';
+import {
+  usePostAccessScopesUsersUserId,
+  usePostUsers,
+  usePutUsersUserId,
+} from '@/api/generated/taskProgressAPI';
 import { UserInputRole } from '@/api/generated/taskProgressAPI.schemas';
 
-import { useAlertDialog } from "@/context/useAlertDialog";
+import { useAlertDialog } from '@/context/useAlertDialog';
 
 import { OrganizationSelectorDialog } from './OrganizationSelectorDialog';
 import type { OrganizationSelectResult, UserFormState } from './types';
@@ -53,11 +63,11 @@ export const UserForm: React.FC<UserFormProps> = ({ initialData, companyId, onSu
   }, [initialData]);
 
   const handleChange = (key: keyof UserFormState, value: string) => {
-    setForm(prev => ({ ...prev, [key]: value }));
+    setForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const handleOrgSelect = (org: OrganizationSelectResult) => {
-    setForm(prev => ({ ...prev, organization_code: org.org_code, organization_id: org.org_id }));
+    setForm((prev) => ({ ...prev, organization_code: org.org_code, organization_id: org.org_id }));
     setOrgDisplayName(`${org.org_name} (${org.org_code})`);
     setOrgDialogOpen(false);
   };
@@ -66,7 +76,11 @@ export const UserForm: React.FC<UserFormProps> = ({ initialData, companyId, onSu
     e.preventDefault();
 
     if (!form.name || !form.email || !form.organization_id) {
-      openAlertDialog({ title: 'エラー', description: '名前、メール、組織コードは必須です', showCancel: false });
+      openAlertDialog({
+        title: 'エラー',
+        description: '名前、メール、組織コードは必須です',
+        showCancel: false,
+      });
       return;
     }
 
@@ -139,7 +153,10 @@ export const UserForm: React.FC<UserFormProps> = ({ initialData, companyId, onSu
         <Button type="button" variant="outline" onClick={() => setOrgDialogOpen(true)}>
           {orgDisplayName}
         </Button>
-        <Select value={form.role} onValueChange={(val) => handleChange('role', val as UserFormState['role'])}>
+        <Select
+          value={form.role}
+          onValueChange={(val) => handleChange('role', val as UserFormState['role'])}
+        >
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="権限" />
           </SelectTrigger>
@@ -152,7 +169,9 @@ export const UserForm: React.FC<UserFormProps> = ({ initialData, companyId, onSu
       </div>
 
       <div className="flex gap-2 justify-end">
-        <Button type="button" variant="secondary" onClick={clearForm}>キャンセル</Button>
+        <Button type="button" variant="secondary" onClick={clearForm}>
+          キャンセル
+        </Button>
         <Button type="submit">{form.id ? '更新' : '登録'}</Button>
       </div>
 
@@ -165,5 +184,3 @@ export const UserForm: React.FC<UserFormProps> = ({ initialData, companyId, onSu
     </form>
   );
 };
-
-

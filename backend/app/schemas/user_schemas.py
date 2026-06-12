@@ -17,7 +17,7 @@ class UserSchema(SQLAlchemyAutoSchema):
             "password_reset_expires_at",
             "password_reset_used",
             )
-    id = fields.Integer(dump_only=True, allow_none=False)
+    id = fields.Integer(required=True,dump_only=True, allow_none=False)
     organization_id = fields.Integer(required=True, allow_none=False)
     organization_name = fields.Method("get_org_name", dump_only=True, allow_none=False, metadata={"type": "string"})
     company_id = fields.Integer(required=True, allow_none=False)

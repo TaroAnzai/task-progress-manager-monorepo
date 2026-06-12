@@ -76,14 +76,18 @@ export const UserSettingComponent = ({
     const payload = {
       password: password,
     };
-    putUser({ userId: user.id, data: payload });
+    if (user.id) {
+      putUser({ userId: user.id, data: payload });
+    }
   };
   const onSubmitName = (e: React.FormEvent) => {
     e.preventDefault();
     const payload = {
       name: newName,
     };
-    putUser({ userId: user.id, data: payload });
+    if (user.id) {
+      putUser({ userId: user.id, data: payload });
+    }
   };
   return (
     <div className="flex justify-center space-x-4 p-4 border rounded bg-white shadow w-full">
