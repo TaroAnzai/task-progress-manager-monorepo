@@ -78,7 +78,11 @@ const AdminPageContent = () => {
           </div>
         </div>
       )}
-      <Accordion type="single" collapsible className="w-full rounded-lg border bg-white">
+      <Accordion
+        type="single"
+        collapsible
+        className="w-full rounded-lg border bg-white max-h-[calc(100vh-120px)] overflow-y-auto"
+      >
         <AccordionItem value="user_password">
           <AccordionTrigger className="ml-4">ユーザー名・パスワード変更</AccordionTrigger>
           <AccordionContent>

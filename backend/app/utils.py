@@ -136,10 +136,6 @@ def check_task_access(
 
 def access_level_sufficient(user_level: TaskAccessLevelEnum, required_level: TaskAccessLevelEnum) -> bool:
     """Return ``True`` if ``user_level`` satisfies ``required_level``."""
-    if not isinstance(user_level, TaskAccessLevelEnum):
-        user_level = TaskAccessLevelEnum(user_level)
-    if not isinstance(required_level, TaskAccessLevelEnum):
-        required_level = TaskAccessLevelEnum(required_level)
 
     return user_level >= required_level
 
@@ -166,7 +162,7 @@ def check_org_access(user: User, organization_id: int, required_role: OrgRoleEnu
                 return True  # 即時アクセス許可
 
         elif scope.role == OrgRoleEnum.ORG_ADMIN:
-            base_id = scope.organization_id or user.organization_id
+            base_id = scope.organization_id
             descendant_ids = get_all_child_organizations(base_id)
             descendant_ids.append(base_id)  # 自組織を含める
             if organization_id in descendant_ids:

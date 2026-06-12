@@ -1,44 +1,23 @@
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, select
+from sqlalchemy import select
 
 from app.models import Group, GroupMember, GroupScopeType, User
 from typing import Any
 
 from app.constants import OrgRoleEnum
 from app.service_errors import ServicePermissionError, ServiceValidationError
-from app.utils import check_org_access, get_ancestor_organization_ids
+from app.utils import check_org_access
 
 
-def list_groups(db_session: Session, current_user: User):
-
+def list_groups(db_session: Session, current_user: User) -> list[Group]:
     if current_user.is_superuser:
-        return db_session.scalars(select(Group)).all()
-    target_org_ids: list[int] = []
-
-    if current_user.organization_id:
-        target_org_ids = get_ancestor_organization_ids(
-            current_user.organization_id
+        stmt = select(Group)
+    else:
+        stmt = select(Group).where(
+            Group.owner_user_id == current_user.id
         )
-    stmt = select(Group).where(
-        or_(
-            # PRIVATE → ownerのみ
-            and_(
-                Group.scope_type == GroupScopeType.PRIVATE,
-                Group.owner_user_id == current_user.id
-            ),
 
-            # ORGANIZATION → 同一organization
-            and_(
-                Group.scope_type == GroupScopeType.ORGANIZATION,
-                Group.organization_id.in_(target_org_ids)
-            ),
-
-            # GLOBAL → 全員
-            Group.scope_type == GroupScopeType.GLOBAL
-        )
-    )
-
-    return db_session.scalars(stmt).all()
+    return list(db_session.scalars(stmt).all())
 
 
 def get_group(db_session: Session, group_id: int):

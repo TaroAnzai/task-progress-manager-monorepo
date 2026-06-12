@@ -4,7 +4,7 @@ from typing import Any, Iterable, Literal
 from sqlalchemy import  or_, select, delete, tuple_, case
 from sqlalchemy.orm import Session
 from app.models import AccessSubject, AccessSubjectType, Group, GroupMember, GroupScopeType, Task, TaskAccess, User, Organization
-from app.utils import check_task_access, access_level_sufficient, get_all_child_organizations
+from app.utils import check_task_access, access_level_sufficient, get_ancestor_organization_ids
 from app.constants import TaskAccessLevelEnum
 from app.service_errors import (
     ServicePermissionError,
@@ -470,7 +470,7 @@ def _search_groups(
 ) -> list[AccessSubjectSearchResult]:
     like_keyword = f"%{keyword}%"
     if user.organization_id:
-        organization_ids = get_all_child_organizations(user.organization_id)
+        organization_ids = get_ancestor_organization_ids(user.organization_id)
     else:
         organization_ids = []
     current_user_id = user.id
