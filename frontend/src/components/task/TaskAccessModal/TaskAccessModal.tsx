@@ -18,13 +18,6 @@ import { CurrentAccessList } from './CurrentAccessList';
 import { toAccessLevelInput, toTaskAccessItems } from './taskAccessMapper';
 import type { AccessSubjectItem, EditableTaskAccessLevel, TaskAccessItem } from './taskAccessTypes';
 
-// 実際のOrval生成フックに置き換え
-// import {
-//   useGetTasksTaskIdAccessLevels,
-//   usePutTasksTaskIdAccessLevels,
-//   useGetAccessSubjectsSearch,
-// } from '@/api/generated/taskProgressAPI';
-
 type TaskAccessModalProps = {
   open: boolean;
   taskId: number;

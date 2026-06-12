@@ -1,4 +1,5 @@
 import { getSubjectIcon, getSubjectTypeLabel } from './accessSubjectUtils';
+import { SubjectDeteailPopover } from './SubjectDeteailPopover';
 import type { EditableTaskAccessLevel, TaskAccessItem, TaskAccessLevel } from './taskAccessTypes';
 
 type CurrentAccessListProps = {
@@ -52,22 +53,11 @@ export const CurrentAccessList = ({
                 key={`${item.subjectType}:${item.refId}`}
                 className="flex items-center gap-3 px-4 py-3"
               >
-                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-base">
-                  {getSubjectIcon(item.subjectType)}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium text-slate-900">{item.name}</span>
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                      {getSubjectTypeLabel(item.subjectType)}
-                    </span>
-                  </div>
-
-                  {item.description && (
-                    <p className="mt-0.5 truncate text-xs text-slate-500">{item.description}</p>
-                  )}
-                </div>
+                <SubjectDeteailPopover
+                  item={item}
+                  getSubjectIcon={getSubjectIcon}
+                  getSubjectTypeLabel={getSubjectTypeLabel}
+                />
 
                 {isOwner ? (
                   <div className="flex items-center gap-2">
