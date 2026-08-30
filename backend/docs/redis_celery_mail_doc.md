@@ -102,7 +102,7 @@ celery.conf.update(
     broker_connection_retry_on_startup=True,  # 起動順の安定化
     task_routes={
         "app.tasks.notifications.*": {"queue": "mail"},
-        "app.tasks.ai.*":            {"queue": "ai"},
+        "app.ai.ai_tasks.*":         {"queue": "ai"},
     },
     beat_schedule={
         "daily-progress-reminder-09": {

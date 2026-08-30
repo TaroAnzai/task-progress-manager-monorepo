@@ -21,7 +21,7 @@ def make_celery():
         timezone="Asia/Tokyo",
         task_routes={
             "app.tasks.notifications.*": {"queue": "mail"},
-            "app.tasks.ai.*": {"queue": "ai"}, 
+            "app.ai.ai_tasks.*": {"queue": "ai"},
         },
         beat_schedule={
             "progress-reminder-every-5min": {

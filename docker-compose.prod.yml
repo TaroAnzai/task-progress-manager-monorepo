@@ -40,8 +40,12 @@ services:
 
   celery_worker:
     build: ./backend
-    command: celery -A app.celery_app.celery worker -Q progress_mail -n
-      progress_mail@%h -c 2 -l info
+    command: >
+      celery -A app.celery_app.celery worker
+      -Q celery,mail,ai
+      -n progress_worker@%h
+      -c 2
+      -l info
     env_file:
       - ./backend/.env.prod
     depends_on:
