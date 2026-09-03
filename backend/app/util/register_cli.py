@@ -21,17 +21,21 @@ def create_superuser_command():
     create_superuser()
 
 def create_superuser():
-
-
-    email = os.getenv("SUPERUSER_EMAIL", "admin@example.com")
+    email = os.getenv("SUPERUSER_EMAIL", "admin@example.com").strip()
     password = os.getenv("SUPERUSER_PASS", "adminpass")
     name = os.getenv("SUPERUSER", "System Admin")
 
-    if not User.query.filter_by(email=email).first():
+    user = User.query.filter_by(normalized_email=email.lower()).first()
+    if user is None:
         user = User()
         user.email = email
         user.password_hash = generate_password_hash(password)
         user.is_superuser = True
         user.name = name
         db.session.add(user)
-        db.session.commit()
+        click.echo(f"Created superuser: {email}")
+    else:
+        user.is_superuser = True
+        click.echo(f"Superuser already exists: {email}")
+
+    db.session.commit()
