@@ -42,10 +42,3 @@ services:
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:?CELERY_RESULT_BACKEND is required}
     restart: always
-  frontend:
-    ports: ["127.0.0.1:${FRONTEND_PORT:?FRONTEND_PORT is required}:80"]
-    build:
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:?VITE_API_BASE_URL is required}
-        VITE_OPENAPI_URL: ${VITE_OPENAPI_URL:?VITE_OPENAPI_URL is required}
-    restart: always

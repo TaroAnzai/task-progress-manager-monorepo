@@ -19,11 +19,12 @@ services:
     volumes: [db_data:/var/lib/mysql]
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
-         
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 20s
+      # A fresh MySQL volume can take several minutes to initialize on slower
+      # hosts. Do not count expected startup failures as healthcheck failures.
+      start_period: 10m
   redis:
     image: redis:7-alpine
   celery_worker:
@@ -40,14 +41,6 @@ services:
     depends_on:
       db_init: {condition: service_completed_successfully}
       redis: {condition: service_started}
-  frontend:
-    build:
-      context: ./frontend
-      args:
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
-        VITE_OPENAPI_URL: ${VITE_OPENAPI_URL:-http://localhost:5000/doc/openapi.json}
-    env_file: [.env]
-    depends_on: [backend]
 volumes:
   db_data:
   mysql_data:

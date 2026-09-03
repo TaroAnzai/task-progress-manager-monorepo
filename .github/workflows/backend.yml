@@ -1,19 +1,23 @@
-name: Backend Deploy
+name: Production Deploy
 
 on:
   push:
     branches:
       - main
     paths:
-      - 'backend/**'
-      - 'compose.yaml'
-      - 'compose.production.yaml'
+      - "backend/**"
+      - "frontend/**"
+      - "compose.yaml"
+      - "compose.production.yaml"
+      - ".github/workflows/backend.yml"
+      - ".github/workflows/frontend.yml"
 
   workflow_dispatch:
 
 jobs:
-  deploy:
+  backend:
     runs-on: ubuntu-latest
+    environment: backend
 
     steps:
       - name: Checkout
@@ -22,13 +26,17 @@ jobs:
       - name: Deploy backend
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
+          host: ${{ vars.SSH_HOST }}
+          username: ${{ vars.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
+          port: ${{ vars.SSH_PORT }}
           script: |
             cd ~/task-progress-docker
             git pull origin main
             compose=(docker compose -f compose.yaml -f compose.production.yaml)
             "${compose[@]}" config --quiet
             "${compose[@]}" up -d --build backend celery_worker celery_beat
+
+  frontend:
+    needs: backend
+    uses: ./.github/workflows/frontend.yml

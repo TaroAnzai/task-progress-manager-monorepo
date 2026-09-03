@@ -87,7 +87,7 @@ flask run # 本番環境では gunicorn を推奨
 cd ../frontend
 npm install
 
-# API 基底 URL はリポジトリルートの .env に設定
+# API 基底 URL と OpenAPI URL はリポジトリルートの .env に設定
 
 # OpenAPI 仕様から API クライアントを生成
 
@@ -96,12 +96,12 @@ npm run generate:api
 # フロントエンド開発サーバー起動
 
 npm run dev
-## Docker Compose
+## 開発環境
 
 環境固有値と秘密情報はリポジトリルートの `.env` だけで管理します。
 `.env` はGit追跡対象外で、`.env.example` が設定項目の正本です。
 
-### 開発
+Backend、DB、Redis、Celery、Mailhog などの backend 系サービスは Docker Compose で起動します。
 
 ```bash
 cp .env.example .env
@@ -109,14 +109,37 @@ cp .env.example .env
 docker compose config
 docker compose up -d --build
 docker compose ps
-docker compose down
 ```
 
 開発では `compose.yaml + compose.override.yaml + .env` が自動適用されます。
-フロントエンドもComposeで起動する場合は `--profile frontend` を付けてください。
 MySQL、Redis、Mailhogは開発用ポートをホストへ公開します。
 
-### 本番
+Frontend は Docker Compose に含まれません。別のターミナルでホスト上から手動起動します。
+
+```bash
+cd frontend
+npm install
+npm run generate:api
+npm run dev
+```
+
+`frontend/orval.config.ts` と Vite はリポジトリルートの `.env` を参照します。
+
+## 本番デプロイ
+
+Backend と Frontend の運用先は分離されています。
+
+```text
+backend VPS                 GitHub Actions
+├─ backend                       │ npm ci / Orval / build
+├─ db                            ▼
+├─ redis                    frontend/dist
+├─ celery_worker                 │ SCP
+├─ celery_beat                   ▼
+└─ db_init                  Frontend 配信サーバー
+```
+
+### Backend
 
 本番サーバーに本番用の `.env` を配置し、必須値を設定してください。
 
@@ -127,25 +150,79 @@ compose=(docker compose -f compose.yaml -f compose.production.yaml)
 ```
 
 本番では `compose.override.yaml` を指定しません。DBとRedisはホストへ公開されず、
-BackendとFrontendはreverse proxy向けに `127.0.0.1` へbindされます。
+Backend は reverse proxy 向けに `127.0.0.1` へ bind されます。Frontend はこの Compose 構成には含まれません。
+
+### Frontend と GitHub Actions
+
+`.github/workflows/backend.yml` は `main` への対象パスの push、または `workflow_dispatch` で起動します。
+最初に backend VPS の Compose deployment を完了し、成功した場合だけ `needs: backend` の job から
+`.github/workflows/frontend.yml` を reusable workflow として呼び出します。Frontend workflow は GitHub Actions runner 上で
+API client の生成と frontend build を行い、`frontend/dist` の内容を Frontend 配信サーバーへ転送します。
+Orval は backend deployment 後に `VITE_OPENAPI_URL` の OpenAPI endpoint を参照します。
+
+GitHub の Environments に `backend` と `frontend` を作成し、次の設定を登録します。
+値はリポジトリへ保存しません。秘密情報である SSH private key だけを Secret とし、その他は Variables にします。
+
+#### `backend` Environment
+
+| 種類 | 名前 | 用途 |
+| --- | --- | --- |
+| Secret | `SSH_KEY` | backend VPS の SSH private key |
+| Variable | `SSH_HOST` | backend VPS の SSH host |
+| Variable | `SSH_USER` | backend VPS の SSH user |
+| Variable | `SSH_PORT` | backend VPS の SSH port |
+
+#### `frontend` Environment
+
+| 種類 | 名前 | 用途 |
+| --- | --- | --- |
+| Secret | `SSH_KEY` | Frontend 配信サーバーの SSH private key |
+| Variable | `SSH_HOST` | Frontend 配信サーバーの SSH host |
+| Variable | `SSH_USER` | Frontend 配信サーバーの SSH user |
+| Variable | `SSH_PORT` | Frontend 配信サーバーの SSH port |
+| Variable | `FRONTEND_DEPLOY_PATH` | `dist` の内容を配置する公開ディレクトリ |
+| Variable | `VITE_API_BASE_URL` | ブラウザから利用する本番 API base URL |
+| Variable | `VITE_OPENAPI_URL` | Orval が取得する本番 OpenAPI JSON URL |
+
+既存の Repository Secrets は Environment 設定への移行後に削除できます。少なくとも `SSH_HOST`、`SSH_USER`、`SSH_PORT` は
+Secrets ではなく各 Environment の Variables に移し、`SSH_KEY` は各 Environment の Secret として登録します。
+
+### 旧 Frontend コンテナの移行
+
+新しい Frontend 配信サーバーへの deployment が成功したことを確認してから、一度だけ backend VPS 上の旧コンテナを削除します。
+まず対象をラベルで確認し、表示された frontend コンテナだけを名前または ID で指定してください。
+
+```bash
+docker ps -a \
+  --filter label=com.docker.compose.project=task-progress-docker \
+  --filter label=com.docker.compose.service=frontend
+docker rm -f task-progress-docker-frontend-1
+```
+
+Compose project 名やコンテナ名が異なる場合は、1つ目のコマンドに表示された名前を使用します。
+DB volume を削除する `docker compose down -v` は使用しません。
 
 主要な環境変数
 バックエンドの config.py では多数の環境変数を読み込みます。最低限必要なものは以下です。
 
-変数名 用途
-DATABASE_URL SQLAlchemy に渡す DB 接続文字列 (例: mysql+pymysql://user:pass@localhost/progress_db)
-SECRET_KEY セッションやCSRFトークンに使用する秘密鍵
-FRONTEND_URL CORS 設定で許可するフロントエンドの URL (デフォルト http://localhost:5173)
-CORS_ORIGINS アクセスを許可するドメインのカンマ区切りリスト
-API_TITLE / API_VERSION OpenAPI ドキュメントのタイトルとバージョン
-CELERY_BROKER_URL / CELERY_RESULT_BACKEND 非同期ジョブ用のブローカー（通常は Redis）
-SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD メール送信に利用する SMTP サーバー情報
-GOOGLE_API_KEY / GEMINI_MODEL Gemini API を利用する場合のキーとモデル名
+| 変数名 | 用途 |
+| --- | --- |
+| `DATABASE_URL` | SQLAlchemy に渡す DB 接続文字列 |
+| `SECRET_KEY` | セッションや CSRF token に使用する秘密鍵 |
+| `FRONTEND_URL` | Backend が CORS や Frontend URL の生成に使用する URL |
+| `FRONTEND_BASE_URL` | password reset link の生成に使用する Frontend URL |
+| `CORS_ORIGINS` | アクセスを許可する domain のカンマ区切りリスト |
+| `API_TITLE` / `API_VERSION` | OpenAPI document の title と version |
+| `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | 非同期 job 用の Redis URL |
+| `SMTP_HOST` / `SMTP_USERNAME` / `SMTP_PASSWORD` | mail 送信に利用する SMTP server 情報 |
+| `GOOGLE_API_KEY` / `GEMINI_MODEL` | Gemini API の設定 |
+
 フロントエンドでは、以下の環境変数を .env に設定します:
 
-変数名 用途
-VITE_API_BASE_URL バックエンド API のベース URL (例: http://localhost:5000)
-VITE_OPENAPI_URL OpenAPI JSON の URL (例: http://localhost:5000/openapi.json)
+| 変数名 | 用途 |
+| --- | --- |
+| `VITE_API_BASE_URL` | Backend API の base URL（開発時の既定例は `/api`） |
+| `VITE_OPENAPI_URL` | OpenAPI JSON の URL（例: `http://localhost:5000/doc/openapi.json`） |
 プロジェクト構成
 task-progress-manager-monorepo/
 ├── backend/ # Flask API (task progress 管理)

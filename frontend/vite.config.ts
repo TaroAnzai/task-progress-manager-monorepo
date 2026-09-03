@@ -13,6 +13,8 @@ export default defineConfig(({ command }) => {
 
   return {
     plugins: [react()],
+    // Keep local frontend settings in the repository-level .env.
+    envDir: '..',
     base: isDev ? '/' : '/progress/',
     server: {
       ...serverConfig,

@@ -1,41 +1,47 @@
 name: Frontend Deploy
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'frontend/**'
-      - 'compose.yaml'
-      - 'compose.production.yaml'
-
-  workflow_dispatch:
+  workflow_call:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: frontend
 
     steps:
-      # ---------------------------
-      # Checkout
-      # ---------------------------
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ---------------------------
-      # Node
-      # ---------------------------
-      - name: Deploy frontend
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
-          script: |
-            cd ~/task-progress-docker
-            git pull origin main
-            compose=(docker compose -f compose.yaml -f compose.production.yaml)
-            "${compose[@]}" config --quiet
-            "${compose[@]}" up -d --build frontend
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Generate API client
+        working-directory: frontend
+        run: npm run generate:api
+        env:
+          VITE_OPENAPI_URL: ${{ vars.VITE_OPENAPI_URL }}
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+
+      - name: Deploy frontend dist
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ vars.SSH_HOST }}
+          username: ${{ vars.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ vars.SSH_PORT }}
+          source: frontend/dist/**
+          target: ${{ vars.FRONTEND_DEPLOY_PATH }}
+          strip_components: 2
