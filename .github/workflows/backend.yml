@@ -6,11 +6,9 @@ on:
       - main
     paths:
       - "backend/**"
-      - "frontend/**"
       - "compose.yaml"
       - "compose.production.yaml"
       - ".github/workflows/backend.yml"
-      - ".github/workflows/frontend.yml"
 
   workflow_dispatch:
 
@@ -40,3 +38,5 @@ jobs:
   frontend:
     needs: backend
     uses: ./.github/workflows/frontend.yml
+    with:
+      run_after_backend: true

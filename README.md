@@ -154,10 +154,14 @@ Backend は reverse proxy 向けに `127.0.0.1` へ bind されます。Frontend
 
 ### Frontend と GitHub Actions
 
-`.github/workflows/backend.yml` は `main` への対象パスの push、または `workflow_dispatch` で起動します。
+`.github/workflows/backend.yml` は `backend/**`、Compose ファイル、または Backend workflow 自体が変更されて
+`main` へ push された場合に起動し、`workflow_dispatch` による手動実行にも対応します。
 最初に backend VPS の Compose deployment を完了し、成功した場合だけ `needs: backend` の job から
-`.github/workflows/frontend.yml` を reusable workflow として呼び出します。Frontend workflow は GitHub Actions runner 上で
+`.github/workflows/frontend.yml` を reusable workflow として呼び出します。
+Frontend workflow はこの呼び出しに加え、`frontend/**` または Frontend workflow 自体が変更されて
+`main` へ push された場合と、`workflow_dispatch` による手動実行でも起動します。GitHub Actions runner 上で
 API client の生成と frontend build を行い、`frontend/dist` の内容を Frontend 配信サーバーへ転送します。
+Backend 関連ファイルと Frontend 関連ファイルが同時に変更された場合は、Frontend の直接実行を抑止し、Backend 成功後に一度だけ実行します。
 Orval は backend deployment 後に `VITE_OPENAPI_URL` の OpenAPI endpoint を参照します。
 
 GitHub の Environments に `backend` と `frontend` を作成し、次の設定を登録します。
