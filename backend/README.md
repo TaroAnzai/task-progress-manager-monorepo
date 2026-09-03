@@ -68,7 +68,7 @@ SECRET_KEY=your-secret-key
 Or copy the template:
 
 ```bash
-cp .env.example .env
+cp ../.env.example ../.env
 ```
 
 ---
@@ -151,4 +151,3 @@ progress-backend/
 - **view** : 閲覧権限（閲覧のみ、オブジェクティブ担当者は進捗入力可）
 
 操作ごとの詳細は、[docs/permissions.md](docs/permissions.md) を参照してください。
-

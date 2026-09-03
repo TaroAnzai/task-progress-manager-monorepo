@@ -18,17 +18,14 @@ jobs:
         with:
           node-version: 24
 
-      # GitHub Secrets から .env.production を生成
-      - name: Create .env.production
-        run: |
-          echo "VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}" >> .env.production
-          echo "VITE_OPENAPI_URL=${{ secrets.VITE_OPENAPI_URL }}" >> .env.production
-
       - name: Install dependencies and build
         run: |
           npm ci
           npm run generate:api
           npm run build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_OPENAPI_URL: ${{ secrets.VITE_OPENAPI_URL }}
 
       # 成果物(dist)をレンタルサーバーにアップロード
       - name: Deploy via SCP

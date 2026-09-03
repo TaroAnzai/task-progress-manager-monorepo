@@ -66,8 +66,9 @@ python -m venv venv
 source venv/bin/activate # Windows: .\venv\Scripts\activate
 pip install -r requirements.txt
 
-# 環境変数ファイルを作成 (.env.example をコピー)
+# リポジトリルートに環境変数ファイルを作成
 
+cd ..
 cp .env.example .env
 
 # .env を編集して DATABASE_URL や SECRET_KEY などを設定
@@ -86,10 +87,7 @@ flask run # 本番環境では gunicorn を推奨
 cd ../frontend
 npm install
 
-# API 基底 URL を指定する場合は .env ファイルを作成（例）
-
-echo "VITE_API_BASE_URL=http://localhost:5000" > .env
-echo "VITE_OPENAPI_URL=http://localhost:5000/openapi.json" >> .env
+# API 基底 URL はリポジトリルートの .env に設定
 
 # OpenAPI 仕様から API クライアントを生成
 
@@ -98,12 +96,38 @@ npm run generate:api
 # フロントエンド開発サーバー起動
 
 npm run dev
-Docker による統合起動 (任意)
+## Docker Compose
 
-リポジトリには docker-compose.yml と docker-compose.prod.yml が含まれており、MySQL、Redis、Flask、React アプリをまとめて起動できます。
+環境固有値と秘密情報はリポジトリルートの `.env` だけで管理します。
+`.env` はGit追跡対象外で、`.env.example` が設定項目の正本です。
 
-docker compose up --build
-本番用設定では docker-compose.prod.yml を利用してください。
+### 開発
+
+```bash
+cp .env.example .env
+# .env に開発用の値を設定
+docker compose config
+docker compose up -d --build
+docker compose ps
+docker compose down
+```
+
+開発では `compose.yaml + compose.override.yaml + .env` が自動適用されます。
+フロントエンドもComposeで起動する場合は `--profile frontend` を付けてください。
+MySQL、Redis、Mailhogは開発用ポートをホストへ公開します。
+
+### 本番
+
+本番サーバーに本番用の `.env` を配置し、必須値を設定してください。
+
+```bash
+compose=(docker compose -f compose.yaml -f compose.production.yaml)
+"${compose[@]}" config --quiet
+"${compose[@]}" up -d --build
+```
+
+本番では `compose.override.yaml` を指定しません。DBとRedisはホストへ公開されず、
+BackendとFrontendはreverse proxy向けに `127.0.0.1` へbindされます。
 
 主要な環境変数
 バックエンドの config.py では多数の環境変数を読み込みます。最低限必要なものは以下です。
@@ -128,7 +152,6 @@ task-progress-manager-monorepo/
 │ ├── app/ # モデル・ルート・サービス・スキーマ
 │ ├── migrations/ # Alembic マイグレーション
 │ ├── docs/ # 設計や権限仕様のドキュメント
-│ ├── .env.example # 環境変数サンプル
 │ ├── requirements.txt
 │ └── run.py # アプリケーションのエントリポイント
 ├── frontend/ # React + Vite SPA
@@ -136,8 +159,10 @@ task-progress-manager-monorepo/
 │ ├── public/ # 静的ファイル
 │ ├── orval.config.ts # OpenAPI からクライアント生成する設定
 │ └── README.md # フロントエンド固有のドキュメント
-├── docker-compose.yml # 開発用 docker compose 設定
-├── docker-compose.prod.yml # 本番用 docker compose 設定
+├── compose.yaml # 開発・本番の共通設定
+├── compose.override.yaml # 開発専用差分
+├── compose.production.yaml # 本番専用差分
+├── .env.example # 環境変数テンプレート
 └── README.md (このファイル)
 使い方
 ブラウザでフロントエンド (デフォルト http://localhost:5173 ) にアクセスします。

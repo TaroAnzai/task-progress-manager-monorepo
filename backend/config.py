@@ -6,17 +6,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
 
-# 先に環境を取得（デフォルトは development）
-#print("=== Config init debug ===")
-env = os.getenv("FLASK_ENV", "development")
-
-# 環境別
-if env == "testing":
-    load_dotenv(BASE_DIR / ".env.test", override=True)
-elif env == "production":
-    load_dotenv(BASE_DIR / ".env.prod", override=True)
-else:  # development
-    load_dotenv(BASE_DIR / ".env.dev", override=True)
+# Compose とローカル実行で同じリポジトリルートの .env を使用する。
+load_dotenv(BASE_DIR.parent / ".env")
 
 
 

@@ -3,7 +3,6 @@
 .env.*
 # サンプルはGit管理する
 !.env.example
-!**/.env.example
 *.log
 .DS_Store
 

@@ -6,6 +6,8 @@ on:
       - main
     paths:
       - 'frontend/**'
+      - 'compose.yaml'
+      - 'compose.production.yaml'
 
   workflow_dispatch:
 
@@ -23,54 +25,7 @@ jobs:
       # ---------------------------
       # Node
       # ---------------------------
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      # ---------------------------
-      # Install
-      # ---------------------------
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      # ---------------------------
-      # Generate API
-      # ---------------------------
-      - name: Generate API
-        working-directory: frontend
-        run: npm run generate:api
-        env:
-          VITE_OPENAPI_URL: https://api.anzai-home.com/progress/api/doc/openapi.json
-
-
-      # ---------------------------
-      # Build
-      # ---------------------------
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
-        env:
-          VITE_API_BASE_URL: https://api.anzai-home.com/progress-dev/api
-      # ---------------------------
-      # Upload dist
-      # ---------------------------
-      - name: Upload dist
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
-
-          source: "frontend/dist/*"
-          target: "/home/taro/task-progress-docker/"
-
-      # ---------------------------
-      # Restart frontend container
-      # ---------------------------
-      - name: Restart frontend
+      - name: Deploy frontend
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -80,4 +35,7 @@ jobs:
 
           script: |
             cd ~/task-progress-docker
-            docker compose -f docker-compose.prod.yml restart frontend
+            git pull origin main
+            compose=(docker compose -f compose.yaml -f compose.production.yaml)
+            "${compose[@]}" config --quiet
+            "${compose[@]}" up -d --build frontend

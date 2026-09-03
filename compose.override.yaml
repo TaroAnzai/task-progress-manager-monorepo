@@ -1,0 +1,30 @@
+services:
+  backend:
+    command: flask run --host=0.0.0.0 --port=5000
+    volumes: [./backend:/app]
+    ports: ["${BACKEND_PORT:-5000}:5000"]
+    environment: {FLASK_ENV: development}
+  db_init:
+    volumes: [./backend:/app]
+    environment: {FLASK_ENV: development}
+  db:
+    ports: ["${MYSQL_HOST_PORT:-3306}:3306"]
+    restart: unless-stopped
+  redis:
+    ports: ["${REDIS_HOST_PORT:-6379}:6379"]
+  celery_worker:
+    volumes: [./backend:/app]
+    environment: {FLASK_ENV: development}
+  celery_beat:
+    volumes: [./backend:/app]
+    environment: {FLASK_ENV: development}
+  mailhog:
+    image: mailhog/mailhog
+    ports: ["${MAILHOG_UI_PORT:-8026}:8025", "${MAILHOG_SMTP_PORT:-1025}:1025"]
+  frontend:
+    profiles: [frontend]
+    build: {target: builder}
+    command: npm run dev
+    volumes: [./frontend:/app, /app/node_modules]
+    ports: ["${FRONTEND_PORT:-5174}:5174"]
+    environment: {DOCKER: "true"}

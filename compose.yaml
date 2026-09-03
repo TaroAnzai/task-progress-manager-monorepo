@@ -1,0 +1,53 @@
+services:
+  backend:
+    build: ./backend
+    env_file: [.env]
+    depends_on:
+      db_init: {condition: service_completed_successfully}
+      redis: {condition: service_started}
+  db_init:
+    build: ./backend
+    command: sh -c "flask db upgrade && flask create-superuser"
+    env_file: [.env]
+    depends_on:
+      db: {condition: service_healthy}
+    restart: "no"
+  db:
+    image: mysql:8.0
+    env_file: [.env]
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
+    volumes: [db_data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+         
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+  redis:
+    image: redis:7-alpine
+  celery_worker:
+    build: ./backend
+    command: celery -A app.celery_app.celery worker --loglevel=info -Q celery,ai,mail
+    env_file: [.env]
+    depends_on:
+      db_init: {condition: service_completed_successfully}
+      redis: {condition: service_started}
+  celery_beat:
+    build: ./backend
+    command: celery -A app.celery_app.celery beat --loglevel=info
+    env_file: [.env]
+    depends_on:
+      db_init: {condition: service_completed_successfully}
+      redis: {condition: service_started}
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_OPENAPI_URL: ${VITE_OPENAPI_URL:-http://localhost:5000/doc/openapi.json}
+    env_file: [.env]
+    depends_on: [backend]
+volumes:
+  db_data:
+  mysql_data:

@@ -6,7 +6,8 @@ on:
       - main
     paths:
       - 'backend/**'
-      - 'docker-compose.prod.yml'
+      - 'compose.yaml'
+      - 'compose.production.yaml'
 
   workflow_dispatch:
 
@@ -28,4 +29,6 @@ jobs:
           script: |
             cd ~/task-progress-docker
             git pull origin main
-            docker compose -f docker-compose.prod.yml up -d --build backend celery_worker celery_beat
+            compose=(docker compose -f compose.yaml -f compose.production.yaml)
+            "${compose[@]}" config --quiet
+            "${compose[@]}" up -d --build backend celery_worker celery_beat

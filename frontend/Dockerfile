@@ -5,6 +5,8 @@ COPY package.json package-lock.json ./
 RUN npm install
 
 COPY . .
+ARG VITE_API_BASE_URL
+ARG VITE_OPENAPI_URL
 RUN npm run build
 
 # ---------- nginx ----------
