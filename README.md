@@ -154,15 +154,16 @@ Backend は reverse proxy 向けに `127.0.0.1` へ bind されます。Frontend
 
 ### Frontend と GitHub Actions
 
-`.github/workflows/backend.yml` は `backend/**`、Compose ファイル、または Backend workflow 自体が変更されて
-`main` へ push された場合に起動し、`workflow_dispatch` による手動実行にも対応します。
-最初に backend VPS の Compose deployment を完了し、成功した場合だけ `needs: backend` の job から
-`.github/workflows/frontend.yml` を reusable workflow として呼び出します。
-Frontend workflow はこの呼び出しに加え、`frontend/**` または Frontend workflow 自体が変更されて
-`main` へ push された場合と、`workflow_dispatch` による手動実行でも起動します。GitHub Actions runner 上で
-API client の生成と frontend build を行い、`frontend/dist` の内容を Frontend 配信サーバーへ転送します。
-Backend 関連ファイルと Frontend 関連ファイルが同時に変更された場合は、Frontend の直接実行を抑止し、Backend 成功後に一度だけ実行します。
-Orval は backend deployment 後に `VITE_OPENAPI_URL` の OpenAPI endpoint を参照します。
+`.github/workflows/backend.yml` は `backend/**`、`frontend/**`、Compose ファイル、または各 deployment workflow が変更されて
+`main` へ push された場合に起動し、変更内容を判定します。Backend 関連ファイルが変更された場合は、
+`backend` Environment の Variables と Secrets を使って Backend をデプロイします。Frontend のみの変更では
+Backend deployment job をスキップします。
+
+Backend workflow が正常終了すると、`workflow_run` により `.github/workflows/frontend.yml` が独立した workflow として起動します。
+このため、Backend 関連の変更では Backend deployment の完了後に新しい OpenAPI endpoint を使って Orval と Frontend buildを実行し、
+Frontend のみの変更でも不要な Backend deploymentを行わずにFrontendをデプロイします。Frontend workflow は常に
+`frontend` Environment の Variables と Secrets を使用するため、同名の `SSH_KEY` や `SSH_HOST` が Backend と混在しません。
+両方の workflow は `workflow_dispatch` による個別の手動実行にも対応します。
 
 GitHub の Environments に `backend` と `frontend` を作成し、次の設定を登録します。
 値はリポジトリへ保存しません。秘密情報である SSH private key だけを Secret とし、その他は Variables にします。

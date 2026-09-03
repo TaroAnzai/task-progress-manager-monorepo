@@ -1,4 +1,4 @@
-name: Production Deploy
+name: Backend Deploy
 
 on:
   push:
@@ -6,14 +6,42 @@ on:
       - main
     paths:
       - "backend/**"
+      - "frontend/**"
       - "compose.yaml"
       - "compose.production.yaml"
       - ".github/workflows/backend.yml"
+      - ".github/workflows/frontend.yml"
 
   workflow_dispatch:
 
 jobs:
+  detect_backend_changes:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.backend.outputs.changed }}
+    steps:
+      - name: Checkout
+        if: github.event_name == 'push'
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect backend-related changes
+        id: backend
+        if: github.event_name == 'push'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          AFTER_SHA: ${{ github.sha }}
+        run: |
+          if git diff --quiet "$BEFORE_SHA" "$AFTER_SHA" -- backend compose.yaml compose.production.yaml .github/workflows/backend.yml; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
   backend:
+    needs: detect_backend_changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect_backend_changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     environment: backend
 
@@ -34,9 +62,3 @@ jobs:
             compose=(docker compose -f compose.yaml -f compose.production.yaml)
             "${compose[@]}" config --quiet
             "${compose[@]}" up -d --build backend celery_worker celery_beat
-
-  frontend:
-    needs: backend
-    uses: ./.github/workflows/frontend.yml
-    with:
-      run_after_backend: true

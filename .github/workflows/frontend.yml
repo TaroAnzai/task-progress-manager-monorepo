@@ -1,51 +1,21 @@
 name: Frontend Deploy
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "frontend/**"
-      - ".github/workflows/frontend.yml"
-
   workflow_dispatch:
 
-  workflow_call:
-    inputs:
-      run_after_backend:
-        description: Deploy after a successful backend deployment
-        required: false
-        type: boolean
-        default: false
+  workflow_run:
+    workflows:
+      - "Backend Deploy"
+    types:
+      - completed
 
 jobs:
-  detect_backend_changes:
-    runs-on: ubuntu-latest
-    outputs:
-      changed: ${{ steps.backend.outputs.changed }}
-    steps:
-      - name: Checkout
-        if: ${{ github.event_name == 'push' && !inputs.run_after_backend }}
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect backend-related changes
-        id: backend
-        if: ${{ github.event_name == 'push' && !inputs.run_after_backend }}
-        env:
-          BEFORE_SHA: ${{ github.event.before }}
-          AFTER_SHA: ${{ github.sha }}
-        run: |
-          if git diff --quiet "$BEFORE_SHA" "$AFTER_SHA" -- backend compose.yaml compose.production.yaml .github/workflows/backend.yml; then
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          fi
-
   deploy:
-    needs: detect_backend_changes
-    if: ${{ inputs.run_after_backend || github.event_name != 'push' || needs.detect_backend_changes.outputs.changed != 'true' }}
+    if: >-
+      ${{
+        (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+        github.event_name == 'workflow_dispatch'
+      }}
     runs-on: ubuntu-latest
     environment: frontend
 
