@@ -8,10 +8,9 @@ services:
     volumes: [./backend:/app]
     environment: {FLASK_ENV: development}
   db:
-    ports: ["${MYSQL_HOST_PORT:-3306}:3306"]
     restart: unless-stopped
   redis:
-    ports: ["${REDIS_HOST_PORT:-6379}:6379"]
+
   celery_worker:
     volumes: [./backend:/app]
     environment: {FLASK_ENV: development}
