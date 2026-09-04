@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { Eye, EyeOff } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 
@@ -23,6 +23,24 @@ const MESSAGES = {
   LOGIN_BUTTON: 'ログイン',
   LOGIN_LOADING: 'ログイン中...',
 } as const;
+
+const OIDC_ERROR_MESSAGES: Record<string, string> = {
+  configuration_error: 'Common Identity Hubの設定が完了していません。',
+  provider_failure: 'Common Identity Hubでのログインに失敗しました。',
+  invalid_state: '認証リクエストが無効です。再度ログインしてください。',
+  token_exchange_failure: 'Common Identity Hubでのログインに失敗しました。',
+  invalid_id_token: 'Common Identity Hubの認証情報を確認できませんでした。',
+  user_not_registered:
+    'Common Identity Hubへのログインには成功しましたが、Task Progress Managerの利用登録がありません。管理者にお問い合わせください。',
+  email_not_verified: 'メールアドレスが未検証のため、安全上アカウントを連携できません。',
+  identity_conflict: 'このCommon Identity Hubアカウントは別のユーザーに連携されています。',
+  user_unavailable: 'このユーザーは現在利用できません。',
+};
+
+const getOidcLoginUrl = (): string => {
+  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+  return `${apiBaseUrl.replace(/\/$/, '')}/sessions/oidc/login`;
+};
 
 const ROUTES = {
   DEFAULT: '/',
@@ -154,8 +172,30 @@ const LoginButton = ({ isLoading, isDisabled }: LoginButtonProps) => (
 
 // メインコンポーネント
 export default function LoginPage() {
+  const { openAlertDialog } = useAlertDialog();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const handledOidcError = useRef(false);
   const { login, isLoading } = useLogin();
   const { email, setEmail, password, setPassword, getFormData, isFormValid } = useLoginForm();
+
+  useEffect(() => {
+    const errorCode = searchParams.get('oidc_error');
+    if (!errorCode || handledOidcError.current) return;
+
+    handledOidcError.current = true;
+    openAlertDialog({
+      title: 'ログインエラー',
+      description:
+        OIDC_ERROR_MESSAGES[errorCode] ?? 'Common Identity Hubでのログインに失敗しました。',
+      confirmText: '閉じる',
+      showCancel: false,
+    });
+    setSearchParams({}, { replace: true });
+  }, [openAlertDialog, searchParams, setSearchParams]);
+
+  const handleOidcLogin = () => {
+    window.location.assign(getOidcLoginUrl());
+  };
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -173,6 +213,15 @@ export default function LoginPage() {
     <div className="flex flex-col justify-center items-center h-screen bg-gray-100">
       <div className="bg-white shadow-lg rounded-lg p-8 w-full max-w-sm">
         <h1 className="text-2xl font-bold mb-6 text-center">{MESSAGES.LOGIN_TITLE}</h1>
+        <Button type="button" variant="outline" className="w-full" onClick={handleOidcLogin}>
+          Common Identity Hubでログイン
+        </Button>
+
+        <div className="my-6 flex items-center gap-3" aria-hidden="true">
+          <div className="h-px flex-1 bg-gray-300" />
+          <span className="text-sm text-gray-500">または</span>
+          <div className="h-px flex-1 bg-gray-300" />
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <InputField

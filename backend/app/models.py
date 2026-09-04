@@ -148,12 +148,20 @@ class User(BaseModel, UserMixin, SoftDeleteMixin):
     __table_args__ = (
         UniqueConstraint("normalized_email", "is_deleted"),
         UniqueConstraint("wp_user_id", "is_deleted"),
+        UniqueConstraint(
+            "identity_issuer",
+            "identity_subject",
+            name="uq_user_identity_issuer_subject",
+        ),
     )
     wp_user_id: Mapped[Optional[int]] = mapped_column(nullable=True)
 
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     normalized_email: Mapped[str] = mapped_column(String(255), index=True)
+
+    identity_issuer: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    identity_subject: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     password_hash: Mapped[Optional[str]] = mapped_column(String(255))
 

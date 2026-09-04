@@ -24,8 +24,8 @@ export default defineConfig({
   reporter: 'html',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    headless: false,
-    baseURL: 'https://localhost:5173',
+    headless: !!process.env.CI,
+    baseURL: 'http://127.0.0.1:5175',
     ignoreHTTPSErrors: true, // ✅ 自己署名証明書エラーを無視
     trace:
       'on-first-retry' /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */,
@@ -69,10 +69,9 @@ export default defineConfig({
     // },
   ],
 
-  /* Run your local dev server before starting the tests */
-  // webServer: {
-  //   command: 'npm run start',
-  //   url: 'http://localhost:3000',
-  //   reuseExistingServer: !process.env.CI,
-  // },
+  webServer: {
+    command: 'npm run dev -- --host 127.0.0.1 --port 5175',
+    url: 'http://127.0.0.1:5175',
+    reuseExistingServer: !process.env.CI,
+  },
 });

@@ -7,7 +7,7 @@ from app.util.register_cli import register_cli
 from config import Config
 from flask_smorest import Api # type: ignore
 
-from app.extensions import db, login_manager, migrate
+from app.extensions import db, login_manager, migrate, oauth
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 def create_app(config_class: Union[Type[Config], str] = Config):
@@ -31,6 +31,17 @@ def create_app(config_class: Union[Type[Config], str] = Config):
     db.init_app(app)
     migrate.init_app(app, db)
     login_manager.init_app(app)
+    oauth.init_app(app)
+    oauth.register(
+        name="cih",
+        client_id=app.config.get("OIDC_CLIENT_ID"),
+        client_secret=app.config.get("OIDC_CLIENT_SECRET"),
+        server_metadata_url=app.config.get("OIDC_DISCOVERY_URL"),
+        client_kwargs={
+            "scope": "openid email profile",
+            "code_challenge_method": "S256",
+        },
+    )
     register_cli(app)
 
     from app.auth import auth_bp

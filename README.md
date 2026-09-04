@@ -220,6 +220,10 @@ DB volume を削除する `docker compose down -v` は使用しません。
 | `API_TITLE` / `API_VERSION` | OpenAPI document の title と version |
 | `CELERY_BROKER_URL` / `CELERY_RESULT_BACKEND` | 非同期 job 用の Redis URL |
 | `SMTP_HOST` / `SMTP_USERNAME` / `SMTP_PASSWORD` | mail 送信に利用する SMTP server 情報 |
+| `OIDC_ISSUER_URL` | CIH Realm の Issuer URL |
+| `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | Keycloak の confidential client 認証情報 |
+| `OIDC_REDIRECT_URI` | Backend の `/sessions/oidc/callback` の完全URL |
+| `OIDC_FRONTEND_REDIRECT_URL` | OIDCログイン成功後に戻るFrontend URL |
 | `GOOGLE_API_KEY` / `GEMINI_MODEL` | Gemini API の設定 |
 
 フロントエンドでは、以下の環境変数を .env に設定します:
@@ -228,6 +232,27 @@ DB volume を削除する `docker compose down -v` は使用しません。
 | --- | --- |
 | `VITE_API_BASE_URL` | Backend API の base URL（開発時の既定例は `/api`） |
 | `VITE_OPENAPI_URL` | OpenAPI JSON の URL（例: `http://localhost:5000/doc/openapi.json`） |
+
+## Common Identity Hub側の設定
+
+Keycloak Realm `anzai-home` に次のOIDC Clientを登録します。
+
+| 設定 | 値 |
+| --- | --- |
+| Client ID | `task-progress-manager` |
+| Client type | OpenID Connect / confidential（Client authentication有効） |
+| Standard Flow | 有効 |
+| PKCE method | `S256` |
+| Valid Redirect URI（本番） | 本番Backendの `https://<backend-host>/sessions/oidc/callback` |
+| Valid Redirect URI（開発） | `http://localhost:5000/sessions/oidc/callback` |
+| Web Origin（本番） | 本番FrontendのOrigin |
+| Web Origin（開発） | `http://localhost:5174` |
+
+本番の `OIDC_ISSUER_URL` は `https://auth.anzai-home.com/realms/anzai-home` を設定します。
+Client Secretの実値はリポジトリへ保存せず、本番サーバーの `.env` だけに設定してください。
+Discovery、JWKS署名検証、state、nonce、Authorization Code Flow + PKCEはBackendが処理します。
+FrontendへID TokenやAccess Tokenは渡しません。
+
 プロジェクト構成
 task-progress-manager-monorepo/
 ├── backend/ # Flask API (task progress 管理)

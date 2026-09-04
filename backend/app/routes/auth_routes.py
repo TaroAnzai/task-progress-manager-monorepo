@@ -1,9 +1,9 @@
 from flask_smorest import Blueprint, abort
 from flask.views import MethodView
-from flask import jsonify
+from flask import jsonify, redirect
 from app.service_errors import format_error_response
 from flask_login import login_required
-from app.services import auth_service
+from app.services import auth_service, oidc_service
 from app.schemas import (
     LoginSchema,
     WPLoginSchema,
@@ -22,6 +22,27 @@ auth_bp = Blueprint("Auth", __name__, url_prefix="/sessions", description="認�
 @auth_bp.errorhandler(ServiceError)
 def handle_service_error(e: ServiceError):
     return jsonify(format_error_response(e.code, e.name, e.description)), e.code
+
+
+@auth_bp.route("/oidc/login")
+class OIDCLoginResource(MethodView):
+    def get(self):
+        """Common Identity Hubでログインを開始"""
+        try:
+            return oidc_service.begin_login()
+        except (oidc_service.OIDCFlowError, oidc_service.OIDCAccessDeniedError) as error:
+            return redirect(oidc_service.frontend_redirect_url(error.error_code))
+
+
+@auth_bp.route("/oidc/callback")
+class OIDCCallbackResource(MethodView):
+    def get(self):
+        """Common Identity Hubからのコールバックを処理"""
+        try:
+            oidc_service.complete_login()
+            return redirect(oidc_service.frontend_redirect_url())
+        except (oidc_service.OIDCFlowError, oidc_service.OIDCAccessDeniedError) as error:
+            return redirect(oidc_service.frontend_redirect_url(error.error_code))
 
 
 @auth_bp.route("")

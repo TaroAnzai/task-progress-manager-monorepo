@@ -19,6 +19,17 @@ class Config:
     URL_PREFIX = os.getenv("URL_PREFIX", "")
     FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5173")
 
+    # Common Identity Hub / OpenID Connect
+    OIDC_ISSUER_URL = os.getenv("OIDC_ISSUER_URL", "").rstrip("/")
+    OIDC_DISCOVERY_URL = (
+        f"{OIDC_ISSUER_URL}/.well-known/openid-configuration"
+        if OIDC_ISSUER_URL else ""
+    )
+    OIDC_CLIENT_ID = os.getenv("OIDC_CLIENT_ID", "")
+    OIDC_CLIENT_SECRET = os.getenv("OIDC_CLIENT_SECRET", "")
+    OIDC_REDIRECT_URI = os.getenv("OIDC_REDIRECT_URI", "")
+    OIDC_FRONTEND_REDIRECT_URL = os.getenv("OIDC_FRONTEND_REDIRECT_URL", FRONTEND_URL)
+
     # Database
     DB_FILE = os.getenv("DB_FILE", "app.db")
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
