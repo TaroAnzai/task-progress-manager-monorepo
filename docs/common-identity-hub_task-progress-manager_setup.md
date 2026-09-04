@@ -76,14 +76,14 @@ TPM の `.env.example` に合わせた標準構成は以下とする。
 TPM 側の対応する設定:
 
 ```env
-OIDC_ISSUER_URL=http://localhost:8080/realms/anzai-home
+OIDC_ISSUER_URL=http://auth.local:8080/realms/anzai-home
 OIDC_CLIENT_ID=task-progress-manager
 OIDC_CLIENT_SECRET=<CIHで発行したClient Secret>
 OIDC_REDIRECT_URI=http://localhost:5000/sessions/oidc/callback
 OIDC_FRONTEND_REDIRECT_URL=http://localhost:5174/
 ```
 
-CIH のローカル Keycloak 公開ポートを `8080` 以外にしている場合は、`OIDC_ISSUER_URL` のみ実際の公開 URL に合わせる。
+`OIDC_ISSUER_URL` は Discovery JSON および ID Token の `iss` と完全に一致させる。
 
 ### 4.2 本番環境
 
@@ -388,3 +388,132 @@ Keycloak の SSO Session は残すため、再度「Common Identity Hub でロ�
 - [ ] 2回目以降の CIH ログインを確認した。
 - [ ] TPM User がない CIH User が拒否されることを確認した。
 - [ ] TPM の既存 email/password ログインが引き続き利用できることを確認した。
+
+---
+
+## 14. 開発環境の構成・起動手順
+
+### 14.1 Docker network 構成
+
+CIH Keycloak はホストの `http://auth.local:8080` で公開され、共有 external Docker network
+`common-identity-shared` 上で `auth.local` という network alias を持つ。
+
+TPM の Backend だけが、既存の Compose default network に加えて `common-identity-shared` に参加する。
+DB、Redis、Celery、Mailhog は共有 network に参加しない。
+
+```text
+TPM Backend ── default network ── DB / Redis
+     │
+     └── common-identity-shared ── auth.local (CIH Keycloak)
+```
+
+Frontend は Docker Compose へ追加せず、従来どおりホスト上で起動する。
+
+### 14.2 事前準備
+
+ホストから Keycloak にアクセスできるよう、`/etc/hosts` に次を追加する。
+
+```text
+127.0.0.1 auth.local
+```
+
+CIH と TPM が利用する共有 network を作成する。この操作は Docker host ごとに初回のみ必要となる。
+
+```bash
+docker network inspect common-identity-shared >/dev/null 2>&1 \
+  || docker network create common-identity-shared
+```
+
+CIH 側では、開発 Keycloak コンテナをこの network に接続し、`auth.local` の network alias を設定する。
+
+リポジトリルートで `.env.example` をコピーし、Keycloak で発行した Client Secret を `.env` に設定する。
+Secret の実値を Git 管理対象へ記載しないこと。
+
+```bash
+cp .env.example .env
+```
+
+Backend から到達するための別名として `host.docker.internal` を設定してはいけません。
+一方、Redirect URI はブラウザが TPM Backend に戻る URL なので `localhost:5000` のままです。
+
+### 14.3 起動
+
+CIH の開発 Keycloak が起動し、共有 network に接続済みであることを確認してから TPM Backend 系サービスを起動します。
+
+```bash
+docker compose config
+docker compose up -d --build
+```
+
+Frontend は別のターミナルでホスト上から起動します。
+
+```bash
+cd frontend
+npm run dev
+```
+
+### 14.4 疎通確認
+
+ホストから Discovery endpoint を確認します。
+
+```bash
+curl http://auth.local:8080/realms/anzai-home/.well-known/openid-configuration
+```
+
+TPM Backend コンテナからも同じ endpoint を確認します。
+
+```bash
+docker compose exec backend python -c "
+import os, urllib.request
+url=os.environ['OIDC_ISSUER_URL'] + '/.well-known/openid-configuration'
+print('URL:', url)
+response=urllib.request.urlopen(url, timeout=5)
+print('status:', response.status)
+"
+```
+
+HTTP status が `200` で、Discovery JSON の `issuer` が次の値であることを確認してください。
+
+```text
+http://auth.local:8080/realms/anzai-home
+```
+
+### 14.5 ログインフロー
+
+```text
+TPM Login
+↓
+Common Identity Hubでログイン
+↓
+/sessions/oidc/login
+↓
+Backendからauth.localでDiscovery取得
+↓
+Keycloak Login
+↓
+http://localhost:5000/sessions/oidc/callback
+↓
+Token Exchange
+↓
+ID Token / UserInfo検証
+↓
+TPM User特定
+↓
+login_user()
+↓
+TPM Frontend
+```
+
+TPM User の特定には既存の `iss + sub` の紐付けを使用します。初回は verified email による自動リンクが行われ、
+以後もローカル email/password ログインと Flask-Login Session はそのまま利用できます。
+
+### 14.6 本番との差分
+
+開発用共有 network の定義は `compose.override.yaml` だけにあります。本番起動時は override を指定せず、
+次のように `compose.yaml` と `compose.production.yaml` だけを使用するため、`common-identity-shared` は要求されません。
+
+```bash
+docker compose -f compose.yaml -f compose.production.yaml up -d --build
+```
+
+本番の Issuer は `https://auth.anzai-home.com/realms/anzai-home` です。

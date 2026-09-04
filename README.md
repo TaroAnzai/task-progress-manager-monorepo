@@ -103,16 +103,55 @@ npm run dev
 
 Backend、DB、Redis、Celery、Mailhog などの backend 系サービスは Docker Compose で起動します。
 
+Common Identity Hub の開発用 Keycloak を利用する場合は、ホストからも同じ Issuer へアクセスできるよう
+`/etc/hosts` に次を追加してください。
+
+```text
+127.0.0.1 auth.local
+```
+
+CIH と TPM が接続する共有 external network を初回起動前に作成します。
+
+```bash
+docker network inspect common-identity-shared >/dev/null 2>&1 \
+  || docker network create common-identity-shared
+```
+
 ```bash
 cp .env.example .env
-# .env に開発用の値を設定
+# .env に開発用の値（OIDC_CLIENT_SECRETを含む）を設定
 docker compose config
 docker compose up -d --build
 docker compose ps
 ```
 
+開発用の OIDC 設定は次のとおりです。`OIDC_ISSUER_URL` は ID Token の `iss` と完全に一致させます。
+
+```env
+OIDC_ISSUER_URL=http://auth.local:8080/realms/anzai-home
+OIDC_CLIENT_ID=task-progress-manager
+OIDC_CLIENT_SECRET=<Keycloakで発行したSecret>
+OIDC_REDIRECT_URI=http://localhost:5000/sessions/oidc/callback
+OIDC_FRONTEND_REDIRECT_URL=http://localhost:5174/
+```
+
+Keycloak の起動後、ホストと Backend コンテナの両方から Discovery を確認できます。
+
+```bash
+curl http://auth.local:8080/realms/anzai-home/.well-known/openid-configuration
+
+docker compose exec backend python -c "
+import os, urllib.request
+url=os.environ['OIDC_ISSUER_URL'] + '/.well-known/openid-configuration'
+print('URL:', url)
+response=urllib.request.urlopen(url, timeout=5)
+print('status:', response.status)
+"
+```
+
 開発では `compose.yaml + compose.override.yaml + .env` が自動適用されます。
-MySQL、Redis、Mailhogは開発用ポートをホストへ公開します。
+Backend は既存の Compose default network と `common-identity-shared` の両方に参加します。前者で DB・Redis と通信し、
+後者の network alias `auth.local` で CIH Keycloak に接続します。MySQL、Redis、Mailhogは開発用ポートをホストへ公開します。
 
 Frontend は Docker Compose に含まれません。別のターミナルでホスト上から手動起動します。
 
@@ -252,6 +291,9 @@ Keycloak Realm `anzai-home` に次のOIDC Clientを登録します。
 Client Secretの実値はリポジトリへ保存せず、本番サーバーの `.env` だけに設定してください。
 Discovery、JWKS署名検証、state、nonce、Authorization Code Flow + PKCEはBackendが処理します。
 FrontendへID TokenやAccess Tokenは渡しません。
+
+開発環境の詳細な準備と疎通確認は
+[`docs/common-identity-hub_task-progress-manager_setup.md`](docs/common-identity-hub_task-progress-manager_setup.md) を参照してください。
 
 プロジェクト構成
 task-progress-manager-monorepo/
