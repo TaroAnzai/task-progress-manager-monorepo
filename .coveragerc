@@ -1,0 +1,10 @@
+[run]
+branch = True
+source = app
+omit =
+    */__init__.py
+    backend/app/util/send_test_mail.py
+
+[report]
+show_missing = True
+skip_covered = False
