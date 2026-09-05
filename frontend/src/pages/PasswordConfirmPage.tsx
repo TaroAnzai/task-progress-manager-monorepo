@@ -171,7 +171,7 @@ export default function PasswordConfirmPage() {
           <Button variant="ghost" onClick={() => navigate('/login')}>
             ログインへ戻る
           </Button>
-          <Button variant="outline" onClick={() => navigate('/forgot-password')}>
+          <Button variant="outline" onClick={() => navigate('/reset')}>
             再設定メールを送る
           </Button>
         </CardFooter>

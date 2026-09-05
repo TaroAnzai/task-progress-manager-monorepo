@@ -10,8 +10,8 @@ import { useUser } from '@/context/useUser';
 vi.mock('@/api/generated/taskProgressAPI', () => ({ useGetSessionsCurrent: vi.fn() }));
 
 const Consumer = () => {
-  const { user, loading, hasAdminScope, hasSystemAdminScope, getUserRole } = useUser();
-  return <div>{JSON.stringify({ id: user?.id ?? null, loading, admin: hasAdminScope(), system: hasSystemAdminScope(), role: getUserRole() })}</div>;
+  const { user, loading, sessionError, hasAdminScope, hasSystemAdminScope, getUserRole } = useUser();
+  return <div>{JSON.stringify({ id: user?.id ?? null, loading, sessionError: !!sessionError, admin: hasAdminScope(), system: hasSystemAdminScope(), role: getUserRole() })}</div>;
 };
 
 describe('UserProvider', () => {
@@ -27,6 +27,32 @@ describe('UserProvider', () => {
     vi.mocked(useGetSessionsCurrent).mockReturnValue({ data: undefined, isLoading: false, isFetching: false, isSuccess: true, refetch: vi.fn() } as unknown as ReturnType<typeof useGetSessionsCurrent>);
     render(<UserProvider><Consumer /></UserProvider>);
     expect(await screen.findByText(/"id":null,"loading":false/)).toBeInTheDocument();
+  });
+
+  it('stops loading and exposes an error when the session request fails', async () => {
+    vi.mocked(useGetSessionsCurrent).mockReturnValue({
+      error: new Error('network error'), isLoading: false, isFetching: false,
+      isSuccess: false, isError: true, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useGetSessionsCurrent>);
+    render(<UserProvider><Consumer /></UserProvider>);
+    expect(await screen.findByText(/"id":null,"loading":false,"sessionError":true/)).toBeInTheDocument();
+  });
+
+  it('keeps the authenticated user when a background refetch fails', async () => {
+    const authenticatedResult = {
+      data: { id: 9, name: 'Admin' }, isLoading: false, isFetching: false,
+      isSuccess: true, isError: false, error: null, refetch: vi.fn(),
+    } as unknown as ReturnType<typeof useGetSessionsCurrent>;
+    vi.mocked(useGetSessionsCurrent).mockReturnValue(authenticatedResult);
+    const { rerender } = render(<UserProvider><Consumer /></UserProvider>);
+    expect(await screen.findByText(/"id":9,"loading":false,"sessionError":false/)).toBeInTheDocument();
+
+    vi.mocked(useGetSessionsCurrent).mockReturnValue({
+      ...authenticatedResult, data: undefined, isSuccess: false, isError: true,
+      error: new Error('temporary error'),
+    } as unknown as ReturnType<typeof useGetSessionsCurrent>);
+    rerender(<UserProvider><Consumer /></UserProvider>);
+    expect(await screen.findByText(/"id":9,"loading":false,"sessionError":true/)).toBeInTheDocument();
   });
 
   it('derives system administrator permissions from access scopes', async () => {

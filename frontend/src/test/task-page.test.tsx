@@ -30,6 +30,7 @@ const createUserContext = (
 ): UserContextType => ({
   user,
   loading: false,
+  sessionError: null,
   refetchUser: vi.fn(),
   hasAdminScope: vi.fn(() => false),
   hasSystemAdminScope: vi.fn(() => false),
@@ -91,5 +92,22 @@ describe('TaskPage', () => {
 
     await waitFor(() => expect(screen.getByText('Login page')).toBeInTheDocument());
     expect(screen.queryByRole('status', { name: '読み込み中' })).not.toBeInTheDocument();
+  });
+
+  it('shows a retryable authentication error without redirecting to login', () => {
+    const refetchUser = vi.fn();
+    vi.mocked(useUser).mockReturnValue(createUserContext({
+      user: null,
+      sessionError: new Error('network error'),
+      refetchUser,
+    }));
+
+    renderTaskPage();
+
+    expect(screen.queryByRole('status', { name: '読み込み中' })).not.toBeInTheDocument();
+    expect(screen.getByText('認証状態を確認できませんでした。通信状況を確認して、もう一度お試しください。')).toBeInTheDocument();
+    expect(screen.queryByText('Login page')).not.toBeInTheDocument();
+    screen.getByRole('button', { name: '再試行' }).click();
+    expect(refetchUser).toHaveBeenCalledOnce();
   });
 });

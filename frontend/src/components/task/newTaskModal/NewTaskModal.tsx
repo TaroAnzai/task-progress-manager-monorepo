@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
 import { usePostObjectives } from '@/api/generated/taskProgressAPI';
@@ -95,28 +96,44 @@ export const NewTaskModal = ({ open, onClose }: TaskSettingModalProps) => {
       <Dialog open={open} onOpenChange={onClose}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>"新規タスク作成"</DialogTitle>
+            <DialogTitle>新規タスク作成</DialogTitle>
             <DialogDescription></DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            <Textarea
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="タスク名"
-              rows={1}
-              className="h-auto min-h-0 resize-none overflow-hidden"
-            />
+            <div className="space-y-2">
+              <Label htmlFor="task-title">タスク名</Label>
+              <Textarea
+                id="task-title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="タスク名を入力"
+                rows={1}
+                className="h-auto min-h-0 resize-none overflow-hidden"
+              />
+            </div>
 
-            <Textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="タスクの説明"
-              className="h-auto min-h-0"
-            />
+            <div className="space-y-2">
+              <Label htmlFor="task-description">タスクの説明</Label>
+              <Textarea
+                id="task-description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="タスクの説明を入力"
+                className="h-auto min-h-0"
+              />
+            </div>
 
-            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+            <div className="space-y-2">
+              <Label htmlFor="task-due-date">期限</Label>
+              <Input
+                id="task-due-date"
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button
@@ -124,7 +141,7 @@ export const NewTaskModal = ({ open, onClose }: TaskSettingModalProps) => {
               variant="secondary"
               onClick={() => setOpenAiSuggestModal(true)}
             >
-              "AI提案"
+              AI提案
             </Button>
             <Button
               variant="outline"
@@ -135,7 +152,7 @@ export const NewTaskModal = ({ open, onClose }: TaskSettingModalProps) => {
             >
               キャンセル
             </Button>
-            <Button onClick={handleSave}>"作成"</Button>
+            <Button onClick={handleSave}>作成</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

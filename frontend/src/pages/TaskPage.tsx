@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { ClipLoader } from 'react-spinners';
 
+import { Button } from '@/components/ui/button';
+
 import { type TaskUserAccessLevel } from '@/api/generated/taskProgressAPI.schemas';
 
 import { TaskControlPanel } from '@/components/task/TaskControlPanel';
@@ -38,7 +40,7 @@ const loadFromLocalStorage = (): Record<FilterAccessLevel, boolean> => {
   return DEFAULT_FILTER;
 };
 const TaskPageContent = () => {
-  const { user, loading: userLoading, getUserRole } = useUser();
+  const { user, loading: userLoading, sessionError, refetchUser, getUserRole } = useUser();
   const { isLoading: tasksLoading } = useTasks();
   const navigate = useNavigate();
   const location = useLocation();
@@ -53,11 +55,11 @@ const TaskPageContent = () => {
   }, []);
   // ログインしていない場合はログイン画面に遷移
   useEffect(() => {
-    if (userLoading) return;
+    if (userLoading || sessionError) return;
     if (!user) {
       navigate('/login', { state: { from: location.pathname } });
     }
-  }, [userLoading, user, navigate, location.pathname]);
+  }, [userLoading, sessionError, user, navigate, location.pathname]);
 
   const onAllExpand = () => {
     setIsObjExpand(true);
@@ -81,7 +83,7 @@ const TaskPageContent = () => {
     }
   };
 
-  if (userLoading || (user && tasksLoading)) {
+  if (userLoading || (!sessionError && user && tasksLoading)) {
     return (
       <div
         className="flex h-full min-h-64 w-full flex-col items-center justify-center gap-4"
@@ -91,6 +93,16 @@ const TaskPageContent = () => {
       >
         <ClipLoader color="#36d7b7" size={72} aria-hidden="true" />
         <span className="text-sm text-gray-500">読み込み中...</span>
+      </div>
+    );
+  }
+  if (sessionError) {
+    return (
+      <div className="flex h-full min-h-64 w-full flex-col items-center justify-center gap-4 text-center">
+        <p>認証状態を確認できませんでした。通信状況を確認して、もう一度お試しください。</p>
+        <Button type="button" onClick={refetchUser}>
+          再試行
+        </Button>
       </div>
     );
   }

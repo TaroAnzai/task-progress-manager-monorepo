@@ -11,19 +11,26 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
     isLoading,
     isFetching,
     isSuccess,
+    isError,
+    error,
     refetch,
   } = useGetSessionsCurrent();
 
   const [user, setUser] = useState<UserWithScopes | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<unknown | null>(null);
 
   useEffect(() => {
     if (!isLoading && !isFetching && isSuccess) {
       const u = sessionData as UserWithScopes | undefined;
       setUser(u && u.id ? u : null);
+      setSessionError(null);
+      setLoading(false);
+    } else if (!isLoading && !isFetching && isError) {
+      setSessionError(error);
       setLoading(false);
     }
-  }, [isLoading, isFetching, isSuccess, sessionData]);
+  }, [isLoading, isFetching, isSuccess, isError, sessionData, error]);
 
   const hasSystemAdminScope = (): boolean =>
     !!user?.access_scopes?.some((s) => s.role === AccessScopeRole.SYSTEM_ADMIN);
@@ -48,6 +55,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       value={{
         user,
         loading,
+        sessionError,
         refetchUser: refetch,
         hasAdminScope,
         hasSystemAdminScope,
