@@ -2,6 +2,10 @@
 
 import os
 os.environ["FLASK_ENV"] = "testing"
+os.environ["DATABASE_URL"] = "sqlite://"
+os.environ["SECRET_KEY"] = "test-secret-key"
+os.environ["CELERY_BROKER_URL"] = "memory://"
+os.environ["CELERY_RESULT_BACKEND"] = "cache+memory://"
 
 from typing import Any, Callable
 from flask import Flask
@@ -16,7 +20,17 @@ from werkzeug.security import generate_password_hash
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.pool import StaticPool
 import sqlite3
+
+
+class TestConfig(BaseConfig):
+    TESTING = True
+    SQLALCHEMY_DATABASE_URI = "sqlite://"
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "connect_args": {"check_same_thread": False},
+        "poolclass": StaticPool,
+    }
 
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
@@ -27,7 +41,7 @@ def set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
 
 @pytest.fixture(scope='session')
 def app():
-    app = create_app(BaseConfig)
+    app = create_app(TestConfig)
 
     with app.app_context():
         #print(f"[pytest] Using DB: {_db.engine.url}") 
@@ -283,15 +297,18 @@ def setup_task_access(system_admin_client: FlaskClient, task_access_users: dict[
         """タスクに対して各ユーザーのアクセス権限を設定"""
         task_id = task["id"]
 
-        user_access = [
-            {"user_id": task_access_users[level]["id"], "access_level": level.upper()}
+        accesses = [
+            {
+                "subject_type": "USER",
+                "ref_id": task_access_users[level]["id"],
+                "access_level": level.upper(),
+            }
             for level in ["view", "edit", "full", "owner"]
         ]
-        org_access = []  # 必要に応じて組織アクセスも設定可能
 
         res = system_admin_client.put(
             f"/tasks/{task_id}/access_levels",
-            json={"user_access": user_access, "organization_access": org_access}
+            json={"accesses": accesses},
         )
         assert res.status_code == 200
         return task_id

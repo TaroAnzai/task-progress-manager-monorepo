@@ -108,17 +108,18 @@ def test_relation(client,superuser, login_as_user):
 
     #set menmer2 to task scope and admin user to full scope
     res = member_client.put(f"/tasks/{task["id"]}/access_levels",json ={
-        "user_access":[{
-            "user_id": member2_user["id"],
-            "access_level": "VIEW"
-            },
-            {
-            "user_id": admin_user["id"],
-            "access_level": "FULL"
-            }
-            ],
-        "organization_access":[],
-    })
+        "accesses":[{
+                "subject_type": "USER",
+                "ref_id": member2_user["id"],
+                "access_level": "VIEW"
+                },
+                {
+                "subject_type": "USER",
+                "ref_id": admin_user["id"],
+                "access_level": "FULL"
+                }
+                ]
+        })
     assert res.status_code == 200
     #set member2 to objective assign
     res = member_client.put(f"/objectives/{objective["id"]}",json={
@@ -196,7 +197,6 @@ def test_relation(client,superuser, login_as_user):
 
 
     
-
 
 
 

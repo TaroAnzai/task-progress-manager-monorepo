@@ -206,6 +206,7 @@ EXPECTED_USER_KEYS = {
     "id",
     "wp_user_id",
     "name",
+    "email",
     "is_superuser",
     "organization_id",
     "organization_name",
@@ -329,9 +330,9 @@ def test_get_user_deferent_org( login_as_user, system_related_users, root_org):
     assert any(user["organization_id"] == child_org["id"] for user in data), \
         f"organization_id={child_org['id']} のユーザーが見つかりません"
 
-    # 5. sample1@example.com のユーザーデータに email キーが無いこと
+    # 5. ユーザーのメールアドレスが返されること
     sample_user = next((u for u in data if u.get("name") == "Test1") ,None)
-    assert "email" not in sample_user, "emailキーが存在してはいけません"
+    assert sample_user["email"] == "sample1@example.com"
 
     # 6. その他のキーがすべて存在すること（添付データから）
     expected_keys = {

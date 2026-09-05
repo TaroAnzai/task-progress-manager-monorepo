@@ -2,7 +2,50 @@
 import json
 import time
 
+import pytest
+
+from app.services import ai_service
+from app.schemas.ai_schemas import AISuggestionMode
 from flask.testing import FlaskClient
+
+
+@pytest.fixture(autouse=True)
+def fake_ai_tasks(monkeypatch):
+    results = {}
+
+    def enqueue(data):
+        job_id = f"test-job-{len(results) + 1}"
+        mode = data["mode"].value
+        common = {
+            "status": "SUCCESS",
+            "mode": AISuggestionMode(mode),
+            "async_result": {
+                "job_id": job_id,
+                "state": "SUCCESS",
+                "ready": True,
+                "successful": True,
+                "date_done": None,
+                "message": None,
+            },
+        }
+        if mode == "task_name":
+            common["task_title_data"] = {
+                "title": "セキュアなユーザー認証を実装する",
+                "prompt": "test prompt",
+                "raw_data": "test response",
+            }
+        else:
+            common["objectives_data"] = {
+                "objectives": [{"title": "認証機能を実装する"}],
+                "prompt": "test prompt",
+                "raw_data": "test response",
+            }
+        results[job_id] = common
+        return {"job_id": job_id}
+
+    monkeypatch.setattr(ai_service, "enqueue_ai_task", enqueue)
+    monkeypatch.setattr(ai_service, "get_ai_task_result", results.__getitem__)
+
 def test_ai_post_process_task(system_admin_client:FlaskClient):
 
 
