@@ -26,7 +26,6 @@ export default defineConfig({
   use: {
     headless: !!process.env.CI,
     baseURL: 'http://127.0.0.1:5175',
-    ignoreHTTPSErrors: true, // ✅ 自己署名証明書エラーを無視
     trace:
       'on-first-retry' /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */,
   },
@@ -70,6 +69,7 @@ export default defineConfig({
   ],
 
   webServer: {
+    env: { VITE_API_BASE_URL: process.env.TPM_BACKEND_PUBLIC_ORIGIN ?? 'https://auth.local:5000' },
     command: 'npm run dev -- --host 127.0.0.1 --port 5175',
     url: 'http://127.0.0.1:5175',
     reuseExistingServer: !process.env.CI,

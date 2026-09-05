@@ -24,9 +24,11 @@ def create_app(config_class: Union[Type[Config], str] = Config):
     app.config.from_object(config_class)
     URL_PREFIX = app.config.get("URL_PREFIX")
 
-    CORS(app, resources={
-        r"/*": {"origins": app.config['CORS_ORIGINS']}
-    })
+    CORS(
+        app,
+        resources={r"/*": {"origins": app.config["CORS_ORIGINS"]}},
+        supports_credentials=app.config["CORS_SUPPORTS_CREDENTIALS"],
+    )
 
     db.init_app(app)
     migrate.init_app(app, db)

@@ -69,7 +69,7 @@ TPM の `.env.example` に合わせた標準構成は以下とする。
 | --- | --- |
 | Root URL | `http://localhost:5174` |
 | Home URL | `http://localhost:5174/` |
-| Valid Redirect URIs | `http://localhost:5000/sessions/oidc/callback` |
+| Valid Redirect URIs | `https://auth.local:5000/sessions/oidc/callback` |
 | Valid Post Logout Redirect URIs | 未使用。設定不要 |
 | Web Origins | `http://localhost:5174` |
 
@@ -79,7 +79,7 @@ TPM 側の対応する設定:
 OIDC_ISSUER_URL=http://auth.local:8080/realms/anzai-home
 OIDC_CLIENT_ID=task-progress-manager
 OIDC_CLIENT_SECRET=<CIHで発行したClient Secret>
-OIDC_REDIRECT_URI=http://localhost:5000/sessions/oidc/callback
+OIDC_REDIRECT_URI=https://auth.local:5000/sessions/oidc/callback
 OIDC_FRONTEND_REDIRECT_URL=http://localhost:5174/
 ```
 
@@ -214,7 +214,7 @@ POST /api/v1/admin/clients
   "direct_access_grants_enabled": false,
   "service_accounts_enabled": false,
   "redirect_uris": [
-    "http://localhost:5000/sessions/oidc/callback"
+    "https://auth.local:5000/sessions/oidc/callback"
   ],
   "web_origins": [
     "http://localhost:5174"
@@ -411,6 +411,9 @@ Frontend は Docker Compose へ追加せず、従来どおりホスト上で起�
 
 ### 14.2 事前準備
 
+Frontend (`http://localhost:5174`) と Backend (`https://auth.local:5000`) はcross-siteであるため、TPM Session Cookieは `tpm_session; SameSite=None; Secure; HttpOnly` とし、Axiosは `withCredentials: true`、CORSは許可Originを `http://localhost:5174` に限定してcredentialsを許可します。
+
+
 ホストから Keycloak にアクセスできるよう、`/etc/hosts` に次を追加する。
 
 ```text
@@ -433,8 +436,17 @@ Secret の実値を Git 管理対象へ記載しないこと。
 cp .env.example .env
 ```
 
+開発用CAと証明書を作成する。`mkcert` のCAをブラウザへ信頼させ、証明書と秘密鍵は `.devcerts/` に置く（このdirectoryはGit管理対象外）。
+
+```bash
+mkcert -install
+mkdir -p .devcerts
+mkcert -cert-file .devcerts/auth.local.pem \
+  -key-file .devcerts/auth.local-key.pem auth.local
+```
+
 Backend から到達するための別名として `host.docker.internal` を設定してはいけません。
-一方、Redirect URI はブラウザが TPM Backend に戻る URL なので `localhost:5000` のままです。
+ブラウザ向けTPM Backendは `https://auth.local:5000` に統一し、loginとcallbackを同じOriginで処理します。
 
 ### 14.3 起動
 
@@ -444,6 +456,8 @@ CIH の開発 Keycloak が起動し、共有 network に接続済みであるこ
 docker compose config
 docker compose up -d --build
 ```
+
+`https://auth.local:5000/sessions/current` をブラウザまたは `curl` で開き、証明書警告がないことを確認します。Flask自体はDocker内部のHTTP `backend:5000`、Orvalはloopback限定の `http://127.0.0.1:5001` を利用します。
 
 Frontend は別のターミナルでホスト上から起動します。
 
@@ -485,13 +499,13 @@ TPM Login
 ↓
 Common Identity Hubでログイン
 ↓
-/sessions/oidc/login
+https://auth.local:5000/sessions/oidc/login
 ↓
 Backendからauth.localでDiscovery取得
 ↓
 Keycloak Login
 ↓
-http://localhost:5000/sessions/oidc/callback
+https://auth.local:5000/sessions/oidc/callback
 ↓
 Token Exchange
 ↓
@@ -507,7 +521,11 @@ TPM Frontend
 TPM User の特定には既存の `iss + sub` の紐付けを使用します。初回は verified email による自動リンクが行われ、
 以後もローカル email/password ログインと Flask-Login Session はそのまま利用できます。
 
+ブラウザのNetwork/Application panelで、loginとcallbackのOriginがともに `https://auth.local:5000` であること、`tpm_session` が `auth.local` に `Secure; HttpOnly; SameSite=None` で保存されること、Frontendからの `/sessions/current` にCookieが送信されることを確認します。logout後はこのTPM Cookieだけが削除されます。
+
 ### 14.6 本番との差分
+
+`dev_gateway` と `.devcerts` は `compose.override.yaml` だけに存在し、本番の `compose.yaml + compose.production.yaml` では要求されません。本番は従来どおり外部reverse proxyがTLSを終端し、GitHub Environment/本番 `.env` のFrontend・OIDC URLを使用します。
 
 開発用共有 network の定義は `compose.override.yaml` だけにあります。本番起動時は override を指定せず、
 次のように `compose.yaml` と `compose.production.yaml` だけを使用するため、`common-identity-shared` は要求されません。

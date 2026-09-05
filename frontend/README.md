@@ -23,6 +23,9 @@
 
 ## 🔗 API呼び出し方針
 
+開発時の `VITE_API_BASE_URL` は `https://auth.local:5000` です。ブラウザは通常API・email/password login・OIDC loginのすべてへ直接接続し、Cookie送信のためAxiosの `withCredentials: true` を維持します。Viteの `/api` proxyは使用しません。
+
+
 本アプリケーションでは、**Flask-Smorest が生成する OpenAPI 仕様**を利用し、
 型安全かつメンテナンス性の高い API 呼び出しを実現しています。
 
@@ -196,7 +199,7 @@ const TaskList = () => {
 ```ts
 export default {
   progressApi: {
-    input: 'http://localhost:5000/openapi.json',
+    input: 'http://127.0.0.1:5001/doc/openapi.json',
     output: {
       target: './src/api/progressApi.ts',
       client: 'react-query',

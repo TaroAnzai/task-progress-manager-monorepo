@@ -1,5 +1,8 @@
 import { expect, test } from '@playwright/test';
 
+const backendOrigin = process.env.TPM_BACKEND_PUBLIC_ORIGIN ?? 'https://auth.local:5000';
+const currentSessionUrl = `${backendOrigin}/sessions/current`;
+
 const anonymousUser = {
   id: null,
   name: '',
@@ -12,12 +15,11 @@ const anonymousUser = {
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.route('**/api/sessions/current', async (route) => {
-    await route.fulfill({ json: anonymousUser });
-  });
+  await page.route(currentSessionUrl, (route) => route.fulfill({ json: anonymousUser }));
 });
 
-test('CIHログインとローカルログインを表示し、Redirectフローを開始する', async ({ page }) => {
+test('CIHログインとローカルログインを表示し、Backend直通フローを開始する', async ({ page }) => {
+  await page.route(`${backendOrigin}/sessions/oidc/login`, (route) => route.abort());
   await page.goto('/login');
 
   const cihButton = page.getByRole('button', { name: 'Common Identity Hubでログイン' });
@@ -26,14 +28,16 @@ test('CIHログインとローカルログインを表示し、Redirectフロー
   await expect(page.locator('input[type="password"]')).toBeVisible();
   await expect(page.getByRole('button', { name: 'ログイン', exact: true })).toBeVisible();
 
-  const oidcRequest = page.waitForRequest('**/api/sessions/oidc/login');
+  const oidcRequest = page.waitForRequest(`${backendOrigin}/sessions/oidc/login`);
   await cihButton.click();
-  expect((await oidcRequest).url()).toBe('http://127.0.0.1:5175/api/sessions/oidc/login');
+  const requestUrl = new URL((await oidcRequest).url());
+  expect(requestUrl.origin).toBe(new URL(backendOrigin).origin);
+  expect(requestUrl.pathname).toBe('/sessions/oidc/login');
+  expect(requestUrl.pathname).not.toContain('/api/');
 });
 
 test('TPM未登録のOIDCユーザーへ案内を表示する', async ({ page }) => {
   await page.goto('/login?oidc_error=user_not_registered');
-
   await expect(page.getByRole('alertdialog')).toContainText(
     'Task Progress Managerの利用登録がありません'
   );
@@ -41,19 +45,12 @@ test('TPM未登録のOIDCユーザーへ案内を表示する', async ({ page })
 });
 
 test('callback後のFlask Sessionからログイン済みユーザーを復元する', async ({ page }) => {
-  await page.unroute('**/api/sessions/current');
-  await page.route('**/api/sessions/current', async (route) => {
-    await route.fulfill({
-      json: {
-        ...anonymousUser,
-        id: 42,
-        name: 'CIH User',
-        email: 'cih@example.com',
-      },
-    });
-  });
-
+  await page.unroute(currentSessionUrl);
+  await page.route(currentSessionUrl, (route) =>
+    route.fulfill({
+      json: { ...anonymousUser, id: 42, name: 'CIH User', email: 'cih@example.com' },
+    })
+  );
   await page.goto('/');
-
   await expect(page.getByRole('button', { name: 'ログアウト' })).toBeVisible();
 });

@@ -17,6 +17,7 @@ dist/
 
 # Docker
 *.pid
+.devcerts/
 
 # IDE
 .vscode/

@@ -98,6 +98,11 @@ npm run generate:api
 npm run dev
 ## 開発環境
 
+ブラウザ通信は Frontend `http://localhost:5174` と Backend `https://auth.local:5000` の別Originです。通常APIとOIDC loginはすべてBackendへ直接接続し、Vite proxyは使用しません。BackendのTLSは開発専用nginx gatewayで終端します。
+
+初回に `mkcert -install` を実行し、`mkcert -cert-file .devcerts/auth.local.pem -key-file .devcerts/auth.local-key.pem auth.local` で証明書を準備してください。証明書・秘密鍵はGit管理されません。
+
+
 環境固有値と秘密情報はリポジトリルートの `.env` だけで管理します。
 `.env` はGit追跡対象外で、`.env.example` が設定項目の正本です。
 
@@ -131,7 +136,7 @@ docker compose ps
 OIDC_ISSUER_URL=http://auth.local:8080/realms/anzai-home
 OIDC_CLIENT_ID=task-progress-manager
 OIDC_CLIENT_SECRET=<Keycloakで発行したSecret>
-OIDC_REDIRECT_URI=http://localhost:5000/sessions/oidc/callback
+OIDC_REDIRECT_URI=https://auth.local:5000/sessions/oidc/callback
 OIDC_FRONTEND_REDIRECT_URL=http://localhost:5174/
 ```
 
@@ -269,8 +274,8 @@ DB volume を削除する `docker compose down -v` は使用しません。
 
 | 変数名 | 用途 |
 | --- | --- |
-| `VITE_API_BASE_URL` | Backend API の base URL（開発時の既定例は `/api`） |
-| `VITE_OPENAPI_URL` | OpenAPI JSON の URL（例: `http://localhost:5000/doc/openapi.json`） |
+| `VITE_API_BASE_URL` | Backend API の base URL（開発時は `https://auth.local:5000`） |
+| `VITE_OPENAPI_URL` | OpenAPI JSON の URL（例: `http://127.0.0.1:5001/doc/openapi.json`） |
 
 ## Common Identity Hub側の設定
 
@@ -283,7 +288,7 @@ Keycloak Realm `anzai-home` に次のOIDC Clientを登録します。
 | Standard Flow | 有効 |
 | PKCE method | `S256` |
 | Valid Redirect URI（本番） | 本番Backendの `https://<backend-host>/sessions/oidc/callback` |
-| Valid Redirect URI（開発） | `http://localhost:5000/sessions/oidc/callback` |
+| Valid Redirect URI（開発） | `https://auth.local:5000/sessions/oidc/callback` |
 | Web Origin（本番） | 本番FrontendのOrigin |
 | Web Origin（開発） | `http://localhost:5174` |
 

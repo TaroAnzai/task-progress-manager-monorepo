@@ -6,7 +6,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from authlib.integrations.base_client.errors import MismatchingStateError, OAuthError
 from joserfc.errors import JoseError
-from flask import redirect
+from flask import redirect, request, session
 from werkzeug.security import generate_password_hash
 
 from app import db
@@ -40,6 +40,12 @@ def oidc_config(app):
         OIDC_CLIENT_SECRET="test-secret",
         OIDC_REDIRECT_URI="https://api.example.test/sessions/oidc/callback",
         OIDC_FRONTEND_REDIRECT_URL=FRONTEND_URL,
+        SESSION_COOKIE_NAME="tpm_session",
+        SESSION_COOKIE_SAMESITE="None",
+        SESSION_COOKIE_SECURE=True,
+        SESSION_COOKIE_HTTPONLY=True,
+        CORS_ORIGINS=["http://localhost:5174"],
+        CORS_SUPPORTS_CREDENTIALS=True,
     )
 
 
@@ -251,3 +257,73 @@ def test_oidc_rejects_unexpected_issuer(client, monkeypatch):
 
     assert "oidc_error=invalid_id_token" in response.location
     assert user.identity_issuer is None
+
+
+def test_oidc_state_survives_same_backend_origin_and_callback_logs_in(client, monkeypatch):
+    user = _user("stateful@example.com", issuer=ISSUER, subject="cih-subject")
+
+    class StatefulClient:
+        def authorize_redirect(self, redirect_uri: str):
+            state = "same-origin-state"
+            session[f"_state_cih_{state}"] = {
+                "data": {"nonce": "nonce", "code_verifier": "verifier"}
+            }
+            return redirect(
+                f"{ISSUER}/protocol/openid-connect/auth"
+                f"?state={state}&redirect_uri={redirect_uri}"
+            )
+
+        def authorize_access_token(self):
+            state = request.args["state"]
+            if session.pop(f"_state_cih_{state}", None) is None:
+                raise MismatchingStateError()
+            return {"userinfo": _claims(email="stateful@example.com")}
+
+    stateful_client = StatefulClient()
+    monkeypatch.setattr(oidc_service, "get_oidc_client", lambda: stateful_client)
+
+    login_response = client.get("/sessions/oidc/login", base_url="https://api.example.test")
+    login_url = urlsplit(login_response.location)
+    state = parse_qs(login_url.query)["state"][0]
+    callback_response = client.get(
+        f"/sessions/oidc/callback?code=code&state={state}",
+        base_url="https://api.example.test",
+    )
+
+    app_redirect = callback_response.location
+    assert urlsplit(app_redirect).netloc == urlsplit(FRONTEND_URL).netloc
+    assert "oidc_error=invalid_state" not in app_redirect
+    current = client.get("/sessions/current", base_url="https://api.example.test")
+    assert current.get_json()["id"] == user.id
+
+
+def test_cross_origin_cors_allows_credentials_and_not_wildcard(client):
+    response = client.options(
+        "/sessions/current",
+        headers={
+            "Origin": "http://localhost:5174",
+            "Access-Control-Request-Method": "GET",
+        },
+    )
+
+    assert response.headers["Access-Control-Allow-Origin"] == "http://localhost:5174"
+    assert response.headers["Access-Control-Allow-Credentials"] == "true"
+    assert response.headers["Access-Control-Allow-Origin"] != "*"
+
+
+def test_session_cookie_is_tpm_specific_secure_cross_site_cookie(client, superuser):
+    response = client.post(
+        "/sessions",
+        json={"email": superuser["email"], "password": superuser["password"]},
+        headers={"Origin": "http://localhost:5174"},
+        base_url="https://api.example.test",
+    )
+
+    cookie = response.headers["Set-Cookie"]
+    assert cookie.startswith("tpm_session=")
+    assert "Secure" in cookie
+    assert "HttpOnly" in cookie
+    assert "SameSite=None" in cookie
+    assert response.headers["Access-Control-Allow-Credentials"] == "true"
+    current = client.get("/sessions/current", base_url="https://api.example.test")
+    assert current.get_json()["id"] == superuser["id"]

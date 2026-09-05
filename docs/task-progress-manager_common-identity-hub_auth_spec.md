@@ -99,6 +99,8 @@ Flask-Login login_user(user)
 Session Cookie
 ```
 
+開発環境では Frontend `http://localhost:5174` と Backend `https://auth.local:5000` がcross-siteとなる。Session CookieはTPM固有名 `tpm_session`、`SameSite=None; Secure; HttpOnly` とし、CORSはFrontend Originだけをcredentials付きで許可する。OIDC loginとcallbackはいずれもBackend公開Originを使用するため、AuthlibがSessionへ保存したstate・nonce・PKCE verifierをcallbackで復元できる。
+
 ログイン後の各 API は、
 
 ```python

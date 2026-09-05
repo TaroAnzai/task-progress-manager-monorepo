@@ -40,12 +40,14 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY')
     if not SECRET_KEY:
         raise ValueError("SECRET_KEY is required")
-    origins = os.getenv("CORS_ORIGINS", "*")
+    origins = os.getenv("CORS_ORIGINS", "http://localhost:5174")
     CORS_ORIGINS = origins if origins == "*" else origins.split(",")
-    CORS_SUPPORTS_CREDENTIALS = True
+    CORS_SUPPORTS_CREDENTIALS = str_to_bool(
+        os.getenv("CORS_SUPPORTS_CREDENTIALS", "true")
+    )
+    SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "tpm_session")
     SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "None")
-    if SESSION_COOKIE_SAMESITE == "None":
-        SESSION_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = str_to_bool(os.getenv("SESSION_COOKIE_SECURE", "true"))
     SESSION_COOKIE_HTTPONLY = str_to_bool(os.getenv("SESSION_COOKIE_HTTPONLY", "true"))
 
     # OpenAPI/Swagger 設定
