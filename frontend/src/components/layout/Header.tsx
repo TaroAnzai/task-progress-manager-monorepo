@@ -22,7 +22,7 @@ export const Header = () => {
   };
 
   return (
-    <header className="bg-gray-800 text-white px-4 py-1 flex justify-between items-center">
+    <header className="flex shrink-0 items-center justify-between bg-gray-800 px-4 py-1 text-white">
       <h1 className="text-lg font-bold">進捗管理システム Ver1.02</h1>
       <nav className="flex gap-4">
         <Link to="/" className="hover:underline">

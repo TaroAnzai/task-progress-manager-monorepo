@@ -18,9 +18,9 @@ export default function App() {
   const basename = import.meta.env.BASE_URL.replace(/\/$/, '');
   return (
     <Router basename={basename}>
-      <div className="bg-gray-100 h-screen overflow-hidden">
+      <div className="flex h-screen flex-col overflow-hidden bg-gray-100">
         <Header />
-        <main>
+        <main className="min-h-0 flex-1">
           <Routes>
             <Route path="/" element={<TaskPage />} />
 

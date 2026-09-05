@@ -42,13 +42,13 @@ export const TaskProvider = ({ children }: { children: ReactNode }) => {
   const {
     data,
     isLoading: loading,
-    isFetching,
     refetch,
   } = useGetTasks<TaskListResponse>({
     query: { enabled: !!user?.id }, // ログイン後に実行
   });
   const tasks = useMemo(() => data?.tasks ?? [], [data]);
-  const isLoading = loading || isFetching || !user?.id;
+  // Keep already-rendered tasks visible while React Query refreshes them in the background.
+  const isLoading = loading || !user?.id;
   //----------------------CREATE TASK----------------------
   const createTask = (data: TaskInput) => _createTask({ data: data });
 

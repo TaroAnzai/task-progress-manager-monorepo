@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 
 import { useLocation, useNavigate } from 'react-router-dom';
+import { ClipLoader } from 'react-spinners';
 
 import { type TaskUserAccessLevel } from '@/api/generated/taskProgressAPI.schemas';
 
@@ -10,6 +11,7 @@ import { TaskList } from '@/components/task/TaskList';
 import type { PickedUser } from '@/components/task/ViewUserSelectModal/ViewUserSelectModal';
 
 import { getRoleLabelJa } from '@/context/roleLabels';
+import { useTasks } from '@/context/useTasks';
 import { useUser } from '@/context/useUser';
 
 const STORAGE_KEY = 'task_view_mode';
@@ -37,6 +39,7 @@ const loadFromLocalStorage = (): Record<FilterAccessLevel, boolean> => {
 };
 const TaskPageContent = () => {
   const { user, loading: userLoading, getUserRole } = useUser();
+  const { isLoading: tasksLoading } = useTasks();
   const navigate = useNavigate();
   const location = useLocation();
   const [filterLevels, setFilterLevels] = useState(DEFAULT_FILTER);
@@ -78,10 +81,22 @@ const TaskPageContent = () => {
     }
   };
 
-  if (userLoading) return <p className="text-gray-500">読み込み中...</p>;
+  if (userLoading || (user && tasksLoading)) {
+    return (
+      <div
+        className="flex h-full min-h-64 w-full flex-col items-center justify-center gap-4"
+        role="status"
+        aria-label="読み込み中"
+        aria-live="polite"
+      >
+        <ClipLoader color="#36d7b7" size={72} aria-hidden="true" />
+        <span className="text-sm text-gray-500">読み込み中...</span>
+      </div>
+    );
+  }
   if (!user) return null;
   return (
-    <>
+    <div className="flex h-full min-h-0 flex-col">
       <p className="font-bold text-lg mb-1">
         👤 {user.name} (ID: {user.id}) 所属組織:( {user.organization_name}) 権限:(
         {getRoleLabelJa(getUserRole())} )
@@ -94,7 +109,7 @@ const TaskPageContent = () => {
         onSelectUser={handleSelectUser}
       />
       <TaskList isExpandParent={isObjExpand} viewMode={filterLevels} selectedUser={selectedUser} />
-    </>
+    </div>
   );
 };
 

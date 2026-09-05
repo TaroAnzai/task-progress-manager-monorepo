@@ -2,8 +2,6 @@
 
 import { useRef } from 'react';
 
-import { ClipLoader } from 'react-spinners';
-
 import { useGetTaskOrders } from '@/api/generated/taskProgressAPI';
 import { type Task, TaskStatus } from '@/api/generated/taskProgressAPI.schemas';
 
@@ -53,15 +51,8 @@ export const TaskList = ({ isExpandParent, viewMode, selectedUser }: TaskListPro
       (task.has_assigned_objective && viewMode['ASSIGNED'])
   );
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full w-full">
-        <ClipLoader color="#36d7b7" size={100} />
-      </div>
-    );
-  }
   return (
-    <div ref={scrollRef} className="h-[calc(100vh-120px)] overflow-y-auto space-y-4">
+    <div ref={scrollRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto">
       {filteredTasks.map((task) => (
         <TaskCard key={task.id} taskId={task.id} isExpandParent={isExpandParent} />
       ))}
