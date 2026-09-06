@@ -11,6 +11,8 @@ on:
       - "compose.production.yaml"
       - ".github/workflows/backend.yml"
       - ".github/workflows/frontend.yml"
+      - ".coveragerc"
+      - "pytest.ini"
 
   workflow_dispatch:
 
@@ -33,14 +35,39 @@ jobs:
           BEFORE_SHA: ${{ github.event.before }}
           AFTER_SHA: ${{ github.sha }}
         run: |
-          if git diff --quiet "$BEFORE_SHA" "$AFTER_SHA" -- backend compose.yaml compose.production.yaml .github/workflows/backend.yml; then
+          if git diff --quiet "$BEFORE_SHA" "$AFTER_SHA" -- backend compose.yaml compose.production.yaml .github/workflows/backend.yml .coveragerc pytest.ini; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-  backend:
+  test:
     needs: detect_backend_changes
+    if: github.event_name == 'workflow_dispatch' || needs.detect_backend_changes.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run backend tests
+        run: pytest --cov --cov-report=term-missing --cov-report=json:backend/coverage.json
+
+      - name: Check coverage
+        run: python backend/check_coverage.py backend/coverage.json
+
+  backend:
+    needs: [detect_backend_changes, test]
     if: github.event_name == 'workflow_dispatch' || needs.detect_backend_changes.outputs.changed == 'true'
     runs-on: ubuntu-latest
     environment: backend

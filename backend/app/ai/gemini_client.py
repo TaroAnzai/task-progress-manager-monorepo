@@ -8,7 +8,6 @@ class GeminiAISuggestionClient(AISuggestionClient):
     def __init__(self, api_key: str|None = None, model_name: str|None = None):
         self.api_key = api_key or os.environ["GOOGLE_API_KEY"]
         self.model_name = model_name or os.environ.get("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
-        print(f"[GeminiClient] Api Key: {self.api_key}")
         print(f"[GeminiClient] Using model: {self.model_name}")
         genai.configure(api_key=self.api_key)
         #models = self.list_models()  # 利用可能なモデルを確認

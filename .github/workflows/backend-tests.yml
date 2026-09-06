@@ -3,9 +3,6 @@ name: Backend Tests
 on:
   pull_request:
     paths: ["backend/**", ".coveragerc", "pytest.ini", ".github/workflows/backend-tests.yml"]
-  push:
-    branches: [main]
-    paths: ["backend/**", ".coveragerc", "pytest.ini", ".github/workflows/backend-tests.yml"]
 
 jobs:
   pytest:

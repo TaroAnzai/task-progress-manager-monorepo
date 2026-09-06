@@ -11,14 +11,17 @@ def run_ai_suggestion(self, task_info: dict, mode:str ) -> dict:
         if not isinstance(task_info, dict):
             raise ValueError(f"task_info must be dict, got {type(task_info)}")
 
-        client = GeminiAISuggestionClient()
+        if mode not in (
+            AISuggestionMode.TASK_NAME.value,
+            AISuggestionMode.OBJECTIVES.value,
+        ):
+            raise ValueError(f"Invalid mode: {mode}")
 
+        client = GeminiAISuggestionClient()
         if mode == AISuggestionMode.TASK_NAME.value:
             result = client.suggest_task_name(task_info)
-        elif mode == AISuggestionMode.OBJECTIVES.value:
-            result = client.generate_objectives(task_info)
         else:
-            raise ValueError(f"Invalid mode: {mode}")
+            result = client.generate_objectives(task_info)
 
         return {
             "status": "success",
