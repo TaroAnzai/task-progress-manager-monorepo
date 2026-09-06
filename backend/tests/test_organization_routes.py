@@ -42,7 +42,7 @@ def test_create_root_organization_twice(login_as_user, superuser):
 def test_get_organizations(login_as_user, test_company, root_org, system_related_users):
     system_admin = system_related_users['system_admin']
     client = login_as_user(system_admin['email'], system_admin['password'])
-    res = client.get(f'/organizations?company_id={test_company['id']}')
+    res = client.get(f"/organizations?company_id={test_company['id']}")
     assert res.status_code == 200
     data = res.get_json()
     assert isinstance(data, list)
@@ -54,14 +54,14 @@ def test_get_organizations(login_as_user, test_company, root_org, system_related
 def test_get_organization_by_id(login_as_user, root_org, system_related_users):
     system_admin = system_related_users['system_admin']
     client = login_as_user(system_admin['email'], system_admin['password'])
-    res = client.get(f'/organizations/{root_org['id']}')
+    res = client.get(f"/organizations/{root_org['id']}")
     assert res.status_code == 200
     assert res.get_json()['name'] == root_org['name']
 
 def test_update_organization(login_as_user, root_org, system_related_users):
     system_admin = system_related_users['system_admin']
     client = login_as_user(system_admin['email'], system_admin['password'])
-    res = client.put(f'/organizations/{root_org['id']}', json={
+    res = client.put(f"/organizations/{root_org['id']}", json={
         'name': '新しい名前',
         'parent_id': None
     })
@@ -102,7 +102,7 @@ def test_delete_organization_with_children(login_as_user, root_org, system_relat
 def test_get_organization_tree(login_as_user, root_org, system_related_users):
     system_admin = system_related_users['system_admin']
     client = login_as_user(system_admin['email'], system_admin['password'])
-    res = client.get(f'/organizations/tree?company_id={root_org['company_id']}')
+    res = client.get(f"/organizations/tree?company_id={root_org['company_id']}")
     assert res.status_code == 200
     assert isinstance(res.get_json(), list)
     #company_idない場合はエラー
@@ -122,7 +122,7 @@ def test_get_children(login_as_user, root_org, system_related_users):
     db.session.add(child)
     db.session.commit()
 
-    res = client.get(f'/organizations/{root_org['id']}/children')
+    res = client.get(f"/organizations/{root_org['id']}/children")
     assert res.status_code == 200
     data = res.get_json()
     assert isinstance(data, list)

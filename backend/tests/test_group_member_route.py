@@ -17,7 +17,7 @@ def test_list_group_member(system_admin_client:FlaskClient, group_payload:dict[s
     assert res.status_code == 201, res.get_data(as_text=True)
     data = res.get_json()
 
-    res = system_admin_client.get(f"/groups/{data["id"]}/members")
+    res = system_admin_client.get(f"/groups/{data['id']}/members")
     assert res.status_code == 200, res.get_data(as_text=True)
     data = res.get_json()
     assert data["user_ids"] == group_payload["member_user_ids"], data

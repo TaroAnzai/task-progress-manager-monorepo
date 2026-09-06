@@ -92,7 +92,7 @@ def test_relation(client,superuser, login_as_user):
     objective = res.get_json()["objective"]
 
     #make progress update
-    res = member_client.post(f"/updates/{objective["id"]}", json={
+    res = member_client.post(f"/updates/{objective['id']}", json={
         "status": "UNDEFINED",
         "detail": "update string",
         "report_date": "2025-08-24T14:15:22Z"
@@ -107,7 +107,7 @@ def test_relation(client,superuser, login_as_user):
     assert res.status_code == 200
 
     #set menmer2 to task scope and admin user to full scope
-    res = member_client.put(f"/tasks/{task["id"]}/access_levels",json ={
+    res = member_client.put(f"/tasks/{task['id']}/access_levels",json ={
         "accesses":[{
                 "subject_type": "USER",
                 "ref_id": member2_user["id"],
@@ -122,12 +122,12 @@ def test_relation(client,superuser, login_as_user):
         })
     assert res.status_code == 200
     #set member2 to objective assign
-    res = member_client.put(f"/objectives/{objective["id"]}",json={
+    res = member_client.put(f"/objectives/{objective['id']}",json={
         "assigned_user_id":member2_user["id"]
     })
     assert res.status_code == 200
 
-    res = member_client.get(f"/organizations/{root_org["id"]}")
+    res = member_client.get(f"/organizations/{root_org['id']}")
     assert res.status_code == 200
     org = res.get_json()
     print(json.dumps(org, indent=2))
@@ -139,19 +139,19 @@ def test_relation(client,superuser, login_as_user):
     res = super_client.delete(f"/companies/{company['id']}?force=true")
     assert res.status_code == 400
     #failed to delete organization
-    res = super_client.delete(f"/organizations/{root_org["id"]}?force=true")
+    res = super_client.delete(f"/organizations/{root_org['id']}?force=true")
     assert res.status_code == 400
-    res = super_client.delete(f"/organizations/{child_org["id"]}?force=true")
+    res = super_client.delete(f"/organizations/{child_org['id']}?force=true")
     assert res.status_code == 400
     #log in by admin user
     admin_client =  login_as_user(admin_user["email"], admin_user["password"])
     #failed to delete user
-    res = admin_client.delete(f"/users/{member_user["id"]}?force=true")
+    res = admin_client.delete(f"/users/{member_user['id']}?force=true")
     assert res.status_code == 400
-    res = admin_client.delete(f"/users/{member2_user["id"]}?force=true")
+    res = admin_client.delete(f"/users/{member2_user['id']}?force=true")
     assert res.status_code == 400
     #faild to delete task
-    res = admin_client.delete(f"/tasks/{task["id"]}?force=true")
+    res = admin_client.delete(f"/tasks/{task['id']}?force=true")
     assert res.status_code == 400
 
     #faild to delete objective
@@ -162,32 +162,32 @@ def test_relation(client,superuser, login_as_user):
     updates = res.get_json()
 
     for u in updates:
-        res = admin_client.delete(f"/updates/{u["id"]}?force=true")
+        res = admin_client.delete(f"/updates/{u['id']}?force=true")
         assert res.status_code == 200
     #success to delete objective
     res = admin_client.delete(f"/objectives/{objective['id']}?force=true")
     assert res.status_code == 200
     #success to delete task
-    res = admin_client.delete(f"/tasks/{task["id"]}?force=true")
+    res = admin_client.delete(f"/tasks/{task['id']}?force=true")
     assert res.status_code == 200
     #success to delete user
-    res = admin_client.delete(f"/users/{member_user["id"]}?force=true")
+    res = admin_client.delete(f"/users/{member_user['id']}?force=true")
     assert res.status_code == 200
-    res = admin_client.delete(f"/users/{member2_user["id"]}?force=true")
+    res = admin_client.delete(f"/users/{member2_user['id']}?force=true")
     assert res.status_code == 200
     #success to delete organization
-    res = admin_client.delete(f"/organizations/{child_org["id"]}?force=true")
+    res = admin_client.delete(f"/organizations/{child_org['id']}?force=true")
     assert res.status_code == 200
     #false to delete root org due to admin user
-    res = admin_client.delete(f"/organizations/{root_org["id"]}?force=true")
+    res = admin_client.delete(f"/organizations/{root_org['id']}?force=true")
     assert res.status_code == 400
     #log in by super user
     super_client =  login_as_user(superuser["email"], superuser["password"])
     #delete admin user
-    res = super_client.delete(f"/users/{admin_user["id"]}?force=true")
+    res = super_client.delete(f"/users/{admin_user['id']}?force=true")
     assert res.status_code == 200
     #success to delete root org
-    res = super_client.delete(f"/organizations/{root_org["id"]}?force=true")
+    res = super_client.delete(f"/organizations/{root_org['id']}?force=true")
     assert res.status_code == 200
     #success to delete  company
     res = super_client.delete(f"/companies/{company['id']}?force=true")
