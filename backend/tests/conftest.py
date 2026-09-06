@@ -7,6 +7,9 @@ os.environ["SECRET_KEY"] = "test-secret-key"
 os.environ["CELERY_BROKER_URL"] = "memory://"
 os.environ["CELERY_RESULT_BACKEND"] = "cache+memory://"
 os.environ["FRONTEND_BASE_URL"] = "http://localhost:5174"
+os.environ["SMTP_HOST"] = "localhost"
+os.environ["SMTP_PORT"] = "1025"
+os.environ["MAIL_FROM"] = "noreply@example.test"
 
 from typing import Any, Callable
 from flask import Flask

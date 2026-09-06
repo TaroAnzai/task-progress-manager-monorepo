@@ -34,7 +34,8 @@ def reset_sample_user(system_related_users, login_as_user, root_org):
     return user
 
 
-def test_password_reset_request(client, reset_sample_user):
+def test_password_reset_request(client, reset_sample_user, monkeypatch):
+    monkeypatch.setattr(svc, "send_email", lambda msg, config: "test:ok")
     # ログアウト
     response = client.delete("/sessions/current")
     payload ={"email" : reset_sample_user['email']}
