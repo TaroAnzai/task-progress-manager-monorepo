@@ -7,6 +7,7 @@ import pytest
 from authlib.integrations.base_client.errors import MismatchingStateError, OAuthError
 from joserfc.errors import JoseError
 from flask import redirect, request, session
+from sqlalchemy.exc import IntegrityError
 from werkzeug.security import generate_password_hash
 
 from app import db
@@ -185,6 +186,86 @@ def test_oidc_state_mismatch_is_reported(client, monkeypatch):
 
     assert response.status_code == 302
     assert "oidc_error=invalid_state" in response.location
+
+
+@pytest.mark.parametrize("missing", ["OIDC_ISSUER_URL", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET",
+                                      "OIDC_REDIRECT_URI", "OIDC_FRONTEND_REDIRECT_URL"])
+def test_oidc_requires_complete_configuration(app, missing):
+    app.config[missing] = ""
+    with pytest.raises(oidc_service.OIDCFlowError) as error:
+        oidc_service.get_oidc_client()
+    assert error.value.error_code == "configuration_error"
+
+
+def test_oidc_rejects_missing_client(monkeypatch):
+    monkeypatch.setattr(oidc_service.oauth, "create_client", lambda _name: None)
+    with pytest.raises(oidc_service.OIDCFlowError) as error:
+        oidc_service.get_oidc_client()
+    assert error.value.error_code == "configuration_error"
+
+
+def test_oidc_login_hides_provider_start_failure(client, monkeypatch):
+    broken = FakeOIDCClient()
+    monkeypatch.setattr(broken, "authorize_redirect", lambda _uri: (_ for _ in ()).throw(TimeoutError()))
+    monkeypatch.setattr(oidc_service, "get_oidc_client", lambda: broken)
+    response = client.get("/sessions/oidc/login")
+    assert "oidc_error=provider_failure" in response.location
+
+
+@pytest.mark.parametrize("claims", [None, {}, {"iss": ISSUER, "sub": ""},
+                                     {"iss": 123, "sub": "subject"}])
+def test_oidc_rejects_missing_or_malformed_claims(client, monkeypatch, claims):
+    _mock_client(monkeypatch, claims)
+    response = client.get("/sessions/oidc/callback?code=code&state=state")
+    assert "oidc_error=invalid_id_token" in response.location
+
+
+@pytest.mark.parametrize("email", [None, "", "   ", 123])
+def test_oidc_rejects_missing_email_claim(client, monkeypatch, email):
+    _mock_client(monkeypatch, _claims(email=email))
+    response = client.get("/sessions/oidc/callback?code=code&state=state")
+    assert "oidc_error=user_not_registered" in response.location
+
+
+def test_oidc_rejects_ambiguous_email(client, monkeypatch):
+    first = _user("ambiguous@example.com")
+    second = _user("second-ambiguous@example.com")
+    second.normalized_email = first.normalized_email
+    _mock_client(monkeypatch, _claims(email=first.email))
+    response = client.get("/sessions/oidc/callback?code=code&state=state")
+    assert "oidc_error=identity_conflict" in response.location
+    assert User.query.filter_by(identity_subject="cih-subject").count() == 0
+
+
+def test_oidc_rolls_back_link_conflict(client, monkeypatch):
+    user = _user("commit-conflict@example.com")
+    rolled_back = False
+    real_rollback = db.session.rollback
+    def rollback():
+        nonlocal rolled_back
+        rolled_back = True
+        real_rollback()
+    monkeypatch.setattr(db.session, "commit", lambda: (_ for _ in ()).throw(IntegrityError("x", {}, None)))
+    monkeypatch.setattr(db.session, "rollback", rollback)
+    _mock_client(monkeypatch, _claims(email=user.email))
+    response = client.get("/sessions/oidc/callback?code=code&state=state")
+    assert "oidc_error=identity_conflict" in response.location
+    assert rolled_back
+
+
+def test_oidc_provider_error_and_timeout(client, monkeypatch):
+    assert "oidc_error=provider_failure" in client.get(
+        "/sessions/oidc/callback?error=access_denied").location
+    _mock_client(monkeypatch, error=TimeoutError("provider timeout"))
+    assert "oidc_error=provider_failure" in client.get(
+        "/sessions/oidc/callback?code=code&state=state").location
+
+
+def test_frontend_redirect_appends_login_and_replaces_query(app):
+    app.config["OIDC_FRONTEND_REDIRECT_URL"] = "https://frontend.example.test/app?old=value#fragment"
+    assert oidc_service.frontend_redirect_url() == "https://frontend.example.test/app?old=value#fragment"
+    assert oidc_service.frontend_redirect_url("invalid_state") == \
+        "https://frontend.example.test/app/login?oidc_error=invalid_state"
 
 
 def test_oidc_logout_only_clears_flask_session(client, monkeypatch):
