@@ -21,7 +21,6 @@ services:
       - default
       - common-db-network
   db_init:
-    depends_on: !reset {}
     environment:
       FLASK_ENV: production
       DATABASE_URL: ${DATABASE_URL:?DATABASE_URL is required}

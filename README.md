@@ -176,11 +176,11 @@ Backend と Frontend の運用先は分離されています。
 ```text
 backend VPS                 GitHub Actions
 ├─ backend                       │ npm ci / Orval / build
-├─ db                            ▼
-├─ redis                    frontend/dist
-├─ celery_worker                 │ SCP
-├─ celery_beat                   ▼
-└─ db_init                  Frontend 配信サーバー
+├─ redis                         ▼
+├─ celery_worker            frontend/dist
+├─ celery_beat                   │ SCP
+├─ db_init                       ▼
+└─ common-mysql (外部)       Frontend 配信サーバー
 ```
 
 ### Backend
@@ -193,8 +193,10 @@ compose=(docker compose -f compose.yaml -f compose.production.yaml)
 "${compose[@]}" up -d --build
 ```
 
-本番では `compose.override.yaml` を指定しません。DBとRedisはホストへ公開されず、
-Backend は reverse proxy 向けに `127.0.0.1` へ bind されます。Frontend はこの Compose 構成には含まれません。
+本番では `compose.override.yaml` を指定しません。ローカルMySQLサービスは本番Composeモデルに含まれず、
+Backend、worker、db_initは external network `common-db-network` 上の `common-mysql` に、本番 `.env` の
+`DATABASE_URL` で接続します。Redisはホストへ公開されず、Backend は reverse proxy 向けに
+`127.0.0.1` へ bind されます。Frontend はこの Compose 構成には含まれません。
 
 ### Frontend と GitHub Actions
 

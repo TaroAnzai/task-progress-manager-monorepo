@@ -88,4 +88,4 @@ jobs:
             git pull origin main
             compose=(docker compose -f compose.yaml -f compose.production.yaml)
             "${compose[@]}" config --quiet
-            "${compose[@]}" up -d --build backend celery_worker celery_beat
+            "${compose[@]}" up -d --build

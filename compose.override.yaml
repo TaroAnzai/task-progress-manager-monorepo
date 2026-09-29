@@ -18,7 +18,21 @@ services:
   db_init:
     volumes: [./backend:/app]
     environment: {FLASK_ENV: development}
+    depends_on:
+      db: {condition: service_healthy}
   db:
+    image: mysql:8.0
+    env_file: [.env]
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
+    volumes: [db_data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      # A fresh MySQL volume can take several minutes to initialize on slower
+      # hosts. Do not count expected startup failures as healthcheck failures.
+      start_period: 10m
     restart: unless-stopped
   redis:
 
@@ -35,3 +49,7 @@ services:
 networks:
   common-identity-shared:
     external: true
+
+volumes:
+  db_data:
+  mysql_data:

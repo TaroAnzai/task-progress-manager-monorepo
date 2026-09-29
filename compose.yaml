@@ -9,22 +9,7 @@ services:
     build: ./backend
     command: sh -c "flask db upgrade && flask create-superuser"
     env_file: [.env]
-    depends_on:
-      db: {condition: service_healthy}
     restart: "no"
-  db:
-    image: mysql:8.0
-    env_file: [.env]
-    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci]
-    volumes: [db_data:/var/lib/mysql]
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping --protocol=tcp -h 127.0.0.1 -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      # A fresh MySQL volume can take several minutes to initialize on slower
-      # hosts. Do not count expected startup failures as healthcheck failures.
-      start_period: 10m
   redis:
     image: redis:7-alpine
   celery_worker:
@@ -41,6 +26,3 @@ services:
     depends_on:
       db_init: {condition: service_completed_successfully}
       redis: {condition: service_started}
-volumes:
-  db_data:
-  mysql_data:
