@@ -17,6 +17,9 @@ services:
       SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-true}
       SESSION_COOKIE_HTTPONLY: ${SESSION_COOKIE_HTTPONLY:-true}
     restart: always
+    networks:
+      - default
+      - common-db-network
   db_init:
     environment:
       FLASK_ENV: production
@@ -24,6 +27,9 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       SUPERUSER_EMAIL: ${SUPERUSER_EMAIL:?SUPERUSER_EMAIL is required}
       SUPERUSER_PASS: ${SUPERUSER_PASS:?SUPERUSER_PASS is required}
+    networks:
+      - default
+      - common-db-network
   db:
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
@@ -43,6 +49,9 @@ services:
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:?CELERY_RESULT_BACKEND is required}
     restart: always
+    networks:
+      - default
+      - common-db-network
   celery_beat:
     environment:
       FLASK_ENV: production
@@ -50,4 +59,10 @@ services:
       SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:?CELERY_BROKER_URL is required}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:?CELERY_RESULT_BACKEND is required}
+    networks:
+      - default
+      - common-db-network
     restart: always
+networks:
+  common-db-network:
+    external: true
