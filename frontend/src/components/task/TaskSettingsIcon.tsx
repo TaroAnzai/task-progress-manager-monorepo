@@ -91,7 +91,6 @@ export const TaskSettingsIcon = ({ task, isUpdateTask }: TaskSettingsIconProps) 
         open={openObjectiveModal}
         task={task}
         onClose={() => setOpenObjectiveModal(false)}
-        canUpdate={isUpdateTask}
       />
     </>
   );

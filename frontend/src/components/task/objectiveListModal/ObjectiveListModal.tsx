@@ -33,18 +33,19 @@ import type {
 } from '@/api/generated/taskProgressAPI.schemas';
 
 import { useAlertDialog } from '@/context/useAlertDialog';
+import { useTasks } from '@/context/useTasks';
 
 import { StatusBadgeCell } from '../StatusBadgeCell';
 interface ObjectiveListModalProps {
   open: boolean;
   task: Task;
-  canUpdate: boolean;
   onClose: () => void;
 }
 
-export const ObjectiveListModal = ({ open, task, canUpdate, onClose }: ObjectiveListModalProps) => {
+export const ObjectiveListModal = ({ open, task, onClose }: ObjectiveListModalProps) => {
   const qc = useQueryClient();
   const { openAlertDialog } = useAlertDialog();
+  const { can } = useTasks();
 
   const { data } = useGetObjectivesTasksTaskId(task.id);
   const { mutate: updateObjective } = usePutObjectivesObjectiveId({
@@ -113,7 +114,7 @@ export const ObjectiveListModal = ({ open, task, canUpdate, onClose }: Objective
                 <TableCell className="text-center">
                   <StatusBadgeCell
                     value={obj.status}
-                    disabled={!canUpdate}
+                    disabled={!can('objective.update', obj)}
                     onChange={(newStatus) => {
                       handleUpdateTaskStatus(obj.id, newStatus);
                     }}
@@ -125,7 +126,7 @@ export const ObjectiveListModal = ({ open, task, canUpdate, onClose }: Objective
                     variant="destructive"
                     size="sm"
                     onClick={() => handleDeleteObjective(obj.id)}
-                    disabled={!canUpdate}
+                    disabled={!can('objective.delete', obj)}
                   >
                     削除
                   </Button>
