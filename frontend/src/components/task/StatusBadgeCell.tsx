@@ -64,7 +64,13 @@ export const StatusBadgeCell = ({ value, onChange, disabled = false }: Props) =>
         </button>
       </PopoverTrigger>
 
-      <PopoverContent align="start" side="bottom" sideOffset={4} className="w-40 p-0 z-[9999]">
+      <PopoverContent
+        align="start"
+        side="bottom"
+        sideOffset={4}
+        style={{ pointerEvents: 'auto' }}
+        className="pointer-events-auto z-[9999] w-40 p-0"
+      >
         {Object.entries(STATUS_LABELS).map(([status, label]) => (
           <button
             key={status}
