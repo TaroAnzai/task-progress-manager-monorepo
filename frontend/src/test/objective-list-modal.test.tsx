@@ -1,5 +1,5 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider, useQuery } from '@tanstack/react-query';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -51,34 +51,52 @@ const objective = {
 
 const updateObjective = vi.fn();
 const deleteObjective = vi.fn();
+let updateMutationOptions: {
+  onMutate?: (variables: {
+    objectiveId: number;
+    data: { status: 'COMPLETED' };
+  }) => Promise<unknown>;
+};
 
 const renderModal = () => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  const result = render(
     <QueryClientProvider client={queryClient}>
       <ObjectiveListModal open task={task} onClose={vi.fn()} />
     </QueryClientProvider>
   );
+  return { ...result, queryClient };
 };
 
 describe('ObjectiveListModal permissions', () => {
   beforeEach(() => {
     updateObjective.mockReset();
     deleteObjective.mockReset();
-    vi.mocked(useGetObjectivesTasksTaskId).mockReturnValue({
-      data: { objectives: [objective] },
-    } as ReturnType<typeof useGetObjectivesTasksTaskId>);
-    vi.mocked(usePutObjectivesObjectiveId).mockReturnValue({
-      mutate: updateObjective,
-    } as unknown as ReturnType<typeof usePutObjectivesObjectiveId>);
+    vi.mocked(useGetObjectivesTasksTaskId).mockImplementation(
+      () =>
+        useQuery({
+          queryKey: ['objectives', task.id],
+          queryFn: () => Promise.resolve({ objectives: [objective] }),
+          initialData: { objectives: [objective] },
+        }) as ReturnType<typeof useGetObjectivesTasksTaskId>
+    );
+    vi.mocked(usePutObjectivesObjectiveId).mockImplementation((options) => {
+      updateMutationOptions = options?.mutation as typeof updateMutationOptions;
+      updateObjective.mockImplementation(async (variables) => {
+        await updateMutationOptions.onMutate?.(variables);
+      });
+      return { mutate: updateObjective } as unknown as ReturnType<
+        typeof usePutObjectivesObjectiveId
+      >;
+    });
     vi.mocked(useDeleteObjectivesObjectiveId).mockReturnValue({
       mutate: deleteObjective,
     } as unknown as ReturnType<typeof useDeleteObjectivesObjectiveId>);
   });
 
-  it('allows an EDIT user to update an objective status', () => {
+  it('allows an EDIT user to update an objective status and reflects it in the modal', async () => {
     const can = vi.fn((action: string) =>
       ['objective.update', 'objective.delete'].includes(action)
     );
@@ -94,6 +112,9 @@ describe('ObjectiveListModal permissions', () => {
     expect(updateObjective).toHaveBeenCalledWith({
       objectiveId: objective.id,
       data: { status: 'COMPLETED' },
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'status-COMPLETED' })).toBeEnabled();
     });
   });
 

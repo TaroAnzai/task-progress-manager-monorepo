@@ -28,6 +28,7 @@ import {
 } from '@/api/generated/taskProgressAPI';
 import type {
   Objective,
+  ObjectivesList,
   ObjectiveUpdateStatus as updateStatusType,
   Task,
 } from '@/api/generated/taskProgressAPI.schemas';
@@ -50,18 +51,43 @@ export const ObjectiveListModal = ({ open, task, onClose }: ObjectiveListModalPr
   const { data } = useGetObjectivesTasksTaskId(task.id);
   const { mutate: updateObjective } = usePutObjectivesObjectiveId({
     mutation: {
+      onMutate: async (variables) => {
+        const { queryKey } = getGetObjectivesTasksTaskIdQueryOptions(task.id);
+        await qc.cancelQueries({ queryKey });
+        const previousObjectives = qc.getQueryData<ObjectivesList>(queryKey);
+
+        qc.setQueryData<ObjectivesList | undefined>(queryKey, (old) => {
+          if (!old?.objectives) return old;
+          return {
+            ...old,
+            objectives: old.objectives.map((objective) =>
+              objective.id === variables.objectiveId
+                ? { ...objective, ...variables.data }
+                : objective
+            ),
+          };
+        });
+
+        return { previousObjectives };
+      },
       onSuccess: () => {
         toast.success('オブジェクティブを更新しました');
-        const { queryKey } = getGetObjectivesTasksTaskIdQueryOptions(task.id);
-        qc.invalidateQueries({ queryKey });
       },
-      onError: (error) => {
+      onError: (error, _variables, context) => {
+        if (context?.previousObjectives) {
+          const { queryKey } = getGetObjectivesTasksTaskIdQueryOptions(task.id);
+          qc.setQueryData(queryKey, context.previousObjectives);
+        }
         openAlertDialog({
           title: 'Error',
           description: error,
           confirmText: '閉じる',
           showCancel: false,
         });
+      },
+      onSettled: () => {
+        const { queryKey } = getGetObjectivesTasksTaskIdQueryOptions(task.id);
+        qc.invalidateQueries({ queryKey });
       },
     },
   });
